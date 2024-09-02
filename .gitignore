@@ -1,0 +1,33 @@
+# Ignore the virtual environment folder
+.venv/
+
+# Ignore specific folders
+dist/
+build/
+logs/
+data/
+export/
+config/
+
+# Ignore Tesseract-OCR files
+Tesseract-OCR/*
+!Tesseract-OCR/.gitkeep
+
+# Ignore assets
+assets/*
+!assets/icon.ico
+
+
+# Ignore any Python cache files
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Ignore IDE-specific files (optional)
+.vscode/
+.idea/
+
+# Ignore other common files
+*.log
+*.env
+.DS_Store

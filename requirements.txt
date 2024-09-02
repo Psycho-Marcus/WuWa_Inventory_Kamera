@@ -1,0 +1,8 @@
+pyuac
+PySide6-Fluent-Widgets
+pytesseract
+pydirectinput-rgx
+mss
+opencv-python
+pygetwindow
+pyinstaller
