@@ -5,7 +5,7 @@ import urllib.request
 import logging
 
 from properties.config import basePATH
-from scraping.utils import itemsID
+from scraping.utils import itemsID, charactersID, weaponsID
 
 logger = logging.getLogger('DatabaseManager')
 
@@ -91,29 +91,34 @@ class DataUpdater():
 			except Exception as e:
 				logger.error(f"Failed to update items.json. Error: {str(e)}")
 
-	def update_characters(self):
-		"""Update characters.json based on MultiText.json."""
-		if self.updated or not os.path.isfile('./data/characters.json'):
+	def update_data(self, data_type, pattern_str):
+		"""Update json file based on MultiText.json."""
+		file_name = f'./data/{data_type}.json'
+		if self.updated or not os.path.isfile(file_name):
+			logger.info(f"Updating {data_type}.json...")
 			try:
 				with open('./data/MultiText.json', 'r', encoding='utf-8') as f:
 					info_text = json.load(f)
 
-				pattern = re.compile(r'^RoleInfo_(\d+)_Name$')
-				characters = {
+				pattern = re.compile(pattern_str)
+				data = {
 					info_text[key]: int(match.group(1))
 					for key in info_text
 					if (match := pattern.match(key))
 				}
 
-				with open('./data/characters.json', 'w', encoding='utf-8') as f:
-					json.dump(characters, f, indent=4)
+				with open(file_name, 'w', encoding='utf-8') as f:
+					json.dump(data, f, indent=4)
+				
+				globals()[f"{data_type}ID"].update(data)
 
 			except Exception as e:
-				logger.error(f"Failed to update characters.json. Error: {str(e)}")
+				logger.error(f"Failed to update {file_name}. Error: {str(e)}")
 
 	def run(self):
 		"""Run the data update process."""
 		self._make_folder()
 		self.update_files()
 		self.update_items()
-		self.update_characters()
+		self.update_data('characters', r'^RoleInfo_(\d+)_Name$')
+		self.update_data('weapons', r'^WeaponConf_(\d+)_WeaponName$')

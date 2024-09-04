@@ -1,27 +1,29 @@
-import mss
-import cv2
 import logging
+import string
 import pytesseract
-import numpy as np
+
+from scraping.utils import (
+	scaleWidth, scaleHeight, screenshot,
+	convertToBlackWhite
+)
 
 logger = logging.getLogger('ShellScraper')
 
 def getShell(WIDTH, HEIGHT):
+
 	xShell, yShell, wShell, hShell = (
-		int(1255 / 1920 * WIDTH),
-		int(45 / 1080 * HEIGHT),
-		int(140 / 1920 * WIDTH),
-		int(35 / 1080 * HEIGHT)
+		scaleWidth(1255, WIDTH),
+		scaleHeight(45, HEIGHT),
+		scaleWidth(145, WIDTH),
+		scaleHeight(35, HEIGHT)
 	)
 
-	with mss.mss() as sct:
-		image = np.array(sct.grab((0, 0, WIDTH, HEIGHT)))
-		image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+	image = screenshot(0, 0, WIDTH, HEIGHT)
+	bw = convertToBlackWhite(image[yShell:yShell+hShell, xShell:xShell+wShell])
 
-
-	try: shell = int(pytesseract.image_to_string(image[yShell:yShell+hShell, xShell:xShell+wShell], config='outputbase digits').strip())
+	try: shell = int(pytesseract.image_to_string(bw, config=f'--psm 7 -c tessedit_char_whitelist={string.digits}').strip())
 	except: 
-		logger.critical("Failed to get shells. Error: ", exc_info=True)
+		logger.debug("Failed to get shells. Error: ", exc_info=True)
 		shell = 0
 
 	return {'2': shell}

@@ -1,10 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.win32 import versioninfo as vi
 
+version = (1, 1, 0, 0)
+
 version_file = vi.VSVersionInfo(
     ffi=vi.FixedFileInfo(
-        filevers=(1, 0, 0, 0),
-        prodvers=(1, 0, 0, 0),
+        filevers=version,
+        prodvers=version,
         mask=0x3f,
         flags=0x0,
         OS=0x4,
@@ -17,11 +19,11 @@ version_file = vi.VSVersionInfo(
             vi.StringTable(
                 u'040904B0', [
                     vi.StringStruct(u'FileDescription', u'Simple Wuthering Waves Inventory scanner.'),
-                    vi.StringStruct(u'FileVersion', u'1.0.0.0'),
+                    vi.StringStruct(u'FileVersion', '.'.join(map(str, version))),
                     vi.StringStruct(u'InternalName', u'WuWaInventoryKamera'),
                     vi.StringStruct(u'OriginalFilename', u'WuWa_Inventory_Kamera.exe'),
                     vi.StringStruct(u'ProductName', u'WuWa Inventory Kamera'),
-                    vi.StringStruct(u'ProductVersion', u'1.0.0.0')
+                    vi.StringStruct(u'ProductVersion', '.'.join(map(str, version)))
                 ])
         ]),
         vi.VarFileInfo([vi.VarStruct(u'Translation', [0x0409, 0x04B0])])

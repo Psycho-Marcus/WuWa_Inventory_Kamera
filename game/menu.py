@@ -56,7 +56,7 @@ class MainMenuController:
             result = WindowFocusManager().setForeground()
             if result[0] == 'error':
                 return result
-            time.sleep(0.2)
+            time.sleep(.2)
             WindowManager.updateWindowSize()
 
             time.sleep(1)

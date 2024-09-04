@@ -1,5 +1,6 @@
 import os
 import logging
+from datetime import datetime
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap, QImage
@@ -15,7 +16,7 @@ from qfluentwidgets import (
 	ListWidget, PixmapLabel
 )
 
-from properties.config import cfg, FAILED, INVENTORY
+from properties.config import cfg, FAILED, INVENTORY, START_DATE
 from scraping.scraperExectuter import start
 from scraping.utils import itemsID, savingScraped
 
@@ -220,7 +221,6 @@ class LControlPanel(QFrame):
 	def __setupLayout(self):
 		"""Setup the layout of the control panel."""
 		self.scanEchoes.setEnabled(False)
-		self.scanCharacters.setEnabled(False)
 		self.scanWeapons.setEnabled(False)
 
 		self.panelLayout.setSpacing(8)
@@ -268,6 +268,9 @@ class LControlPanel(QFrame):
 
 	def runScraper(self):
 		"""Run the scraper and emit notifications if needed."""
+		global START_DATE
+
+		START_DATE = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 		notification = start()
 		if notification:
 			logger.debug(f"Notification: {notification}")

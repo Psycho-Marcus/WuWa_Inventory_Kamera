@@ -5,9 +5,13 @@ import signal
 import logging
 import multiprocessing
 
-from properties.config import FAILED, INVENTORY
-from scraping.utils import pressEscape, savingScraped
+from properties.config import FAILED, INVENTORY, CHARACTERS
+from scraping.utils import (
+	pressEscape, savingScraped, scaleWidth,
+	scaleHeight
+)
 from scraping.itemsScraper import itemsScraper
+from scraping.charactersScraper import resonatorScraper
 from scraping.shellScraper import getShell
 from game.menu import MainMenuController
 from game.screenSize import WindowManager
@@ -41,11 +45,11 @@ def managerStart(scraperEnabled: list):
 	stopMonitor.terminate()
 	stopMonitor.join()
 
-	# Retrieve results from the queue
 	while not queue.empty():
 		scraperResult = queue.get()
 		INVENTORY.update(scraperResult['inventory'])
 		FAILED += scraperResult['failed']
+		CHARACTERS.update(scraperResult['characters'])
 
 	savingScraped()
 
@@ -67,23 +71,25 @@ def needToStop(tPID, completeFLAG, PROCESS_ID):
 			except Exception as e:
 				logger.error(f"Error terminating process: {e}")
 			sys.exit(0)
-		time.sleep(0.1)
+		time.sleep(.1)
 
 def scrapers(scraperEnabled: list, WIDTH: int, HEIGHT: int, FLAG: multiprocessing.Event, queue: multiprocessing.Queue): # type: ignore
-	inventory = {}
-	failed = []
+	resonator = dict()
+	inventory = dict()
+	failed = list()
 
 	for scraper in scraperEnabled:
 		match(scraper):
-			case 'characters': pass
+			case 'characters':
+				resonator = resonatorScraper(WIDTH, HEIGHT)
 			case 'weapons': pass
 			case 'echoes': pass
 			case 'devItems':
-				i, f = itemsScraper(int(81.5 / 1920 * WIDTH), int(596.5 / 1080 * HEIGHT), WIDTH, HEIGHT)
+				i, f = itemsScraper(scaleWidth(81.5, WIDTH), scaleHeight(596.5, HEIGHT), WIDTH, HEIGHT)
 				inventory.update(i)
 				failed += f
 			case 'resources':
-				i, f = itemsScraper(int(81.5 / 1920 * WIDTH), int(731.5 / 1080 * HEIGHT), WIDTH, HEIGHT)
+				i, f = itemsScraper(scaleWidth(81.5, WIDTH), scaleHeight(731.5, HEIGHT), WIDTH, HEIGHT)
 				inventory.update(i)
 				failed += f
 		
@@ -96,7 +102,7 @@ def scrapers(scraperEnabled: list, WIDTH: int, HEIGHT: int, FLAG: multiprocessin
 
 
 		pressEscape()
-		time.sleep(0.5)
+		time.sleep(.5)
 	FLAG.set()
 
-	queue.put({'inventory': inventory, 'failed': failed})
+	queue.put({'inventory': inventory, 'failed': failed, 'characters': resonator})

@@ -1,11 +1,10 @@
 import time
-import mss
-import cv2
 import pytesseract
 import pydirectinput
 import numpy as np
 
 from scraping.utils import itemsID
+from scraping.utils import scaleWidth, scaleHeight, screenshot
 from properties.config import cfg
 
 def itemsScraper(
@@ -24,37 +23,37 @@ def itemsScraper(
 	time.sleep(.5)
 
 	xName, yName, wName, hName = (
-		int(1305 / 1920 * WIDTH),
-		int(116 / 1080 * HEIGHT),
-		int(545 / 1920 * WIDTH),
-		int(55 / 1080 * HEIGHT)
+		scaleWidth(1305, WIDTH),
+		scaleHeight(116, HEIGHT),
+		scaleWidth(545, WIDTH),
+		scaleHeight(55, HEIGHT)
 	)
 	xValue, yValue, wValue, hValue = (
-		int(1655 / 1920 * WIDTH),
-		int(320 / 1080 * HEIGHT),
-		int(190 / 1920 * WIDTH),
-		int(40 / 1080 * HEIGHT)
+		scaleWidth(1655, WIDTH),
+		scaleHeight(320, HEIGHT),
+		scaleWidth(190, WIDTH),
+		scaleHeight(40, HEIGHT)
 	)
 
 	xDescription, yDescription, wDescription, hDescription = (
-		int(1296 / 1920 * WIDTH),
-		int(114 / 1080 * HEIGHT),
-		int(558 / 1920 * WIDTH),
-		int(820 / 1080 * HEIGHT)
+		scaleWidth(1296, WIDTH),
+		scaleHeight(114, HEIGHT),
+		scaleWidth(558, WIDTH),
+		scaleHeight(820, HEIGHT)
 	)
 
 	x_start, y_start = (
-		int(205 / 1920 * WIDTH),
-		int(122 / 1080 * HEIGHT)
+		scaleWidth(205, WIDTH),
+		scaleHeight(122, HEIGHT)
 	)
 	w, h = (
-		int(151 / 1920 * WIDTH),
-		int(181 / 1080 * HEIGHT)
+		scaleWidth(151, WIDTH),
+		scaleHeight(181, HEIGHT)
 	)
 
 	# Space between rows and columns
-	dx = w + int(16 / 1920 * WIDTH) # columns
-	dy = h + int(24 / 1080 * HEIGHT) # rows
+	dx = w + scaleWidth(16, WIDTH) # columns
+	dy = h + scaleHeight(24, HEIGHT) # rows
 
 	isDouble = False
 	encounters = dict()
@@ -70,11 +69,9 @@ def itemsScraper(
 				center_x = x + w // 2
 				center_y = y + h // 2
 				pydirectinput.leftClick(center_x, center_y)
-				time.sleep(0.2)
+				time.sleep(.2)
 				
-				with mss.mss() as sct:
-					image = np.array(sct.grab((0, 0, WIDTH, HEIGHT)))
-					image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+				image = screenshot(0, 0, WIDTH, HEIGHT)
 		
 				name = pytesseract.image_to_string(image[yName:yName+hName, xName:xName+wName]).strip()
 				value = pytesseract.image_to_string(image[yValue:yValue+hValue, xValue:xValue+wValue]).strip().split(' ', 1)[1]
@@ -116,11 +113,9 @@ def itemsScraper(
 			center_x = x + w // 2
 			center_y = y + h // 2
 			pydirectinput.leftClick(center_x, center_y)
-			time.sleep(0.2)
+			time.sleep(.2)
 			
-			with mss.mss() as sct:
-				image = np.array(sct.grab((0, 0, WIDTH, HEIGHT)))
-				image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+			image = screenshot(0, 0, WIDTH, HEIGHT)
 			
 			name = pytesseract.image_to_string(image[yName:yName+hName, xName:xName+wName]).strip()
 			value = pytesseract.image_to_string(image[yValue:yValue+hValue, xValue:xValue+wValue]).strip().split(' ', 1)[1]

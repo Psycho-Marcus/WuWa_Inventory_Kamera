@@ -3,7 +3,6 @@ import os
 import string
 import ctypes
 from datetime import datetime
-from typing import List
 
 import pytesseract
 from qfluentwidgets import (
@@ -16,19 +15,18 @@ from qfluentwidgets import (
 user32 = ctypes.windll.user32
 basePATH = getattr(sys, 'frozen', False) and sys._MEIPASS or os.getcwd()
 
-# Default paths and values
-pytesseract.pytesseract.tesseract_cmd = os.path.join(basePATH, 'Tesseract-OCR', 'tesseract.exe')
-
+# Default values
 PROCESS_NAME = 'Client-Win64-Shipping.exe'
 WINDOW_NAME = 'Wuthering Waves'
 START_DATE = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 DPI_SCALING = user32.GetDpiForWindow(user32.GetForegroundWindow()) / 96.0
-INVENTORY = {"2": 0}
-FAILED: List[str] = []
+INVENTORY = dict()
+FAILED: list[dict] = list()
+CHARACTERS = dict()
 maxLength = 12
 
 
-def alphabethList() -> List[str]:
+def alphabethList() -> list[str]:
 	"""Generate a list of uppercase letters, digits, and punctuation."""
 	return list(string.ascii_uppercase + string.digits + string.punctuation)
 
@@ -103,6 +101,7 @@ class Config(QConfig):
 
 	# Configuration items
 	exportFolder = ConfigItem("Folders", "Export", "export", FolderValidator())
+	tesseractFolder = ConfigItem("Folders", "Tesseract", os.path.join(basePATH, 'Tesseract-OCR'), FolderValidator())
 	checkUpdateAtStartUp = ConfigItem("Update", "CheckUpdateAtStartUp", True, BoolValidator())
 	gameLanguages = OptionsConfigItem('InGame', 'Language', 'English', OptionsValidator(['English']))
 	inventoryKeybind = OptionsConfigItem('InGame', 'InventoryKeybind', 'B', OptionsValidator(alphabethList()))
@@ -130,3 +129,6 @@ RELEASE_URL = "https://github.com/Psycho-Marcus/WuWa_Inventory_Kamera/releases/l
 # Load configuration
 cfg = Config()
 qconfig.load('config/config.json', cfg)
+
+# Tesseract path
+pytesseract.pytesseract.tesseract_cmd = os.path.join(cfg.get(cfg.tesseractFolder), 'tesseract.exe')
