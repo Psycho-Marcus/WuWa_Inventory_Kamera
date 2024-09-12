@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.win32 import versioninfo as vi
 
-version = (1, 1, 0, 0)
+version = (1, 4, 2, 0)
 
 version_file = vi.VSVersionInfo(
     ffi=vi.FixedFileInfo(

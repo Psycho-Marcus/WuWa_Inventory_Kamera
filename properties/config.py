@@ -18,11 +18,9 @@ basePATH = getattr(sys, 'frozen', False) and sys._MEIPASS or os.getcwd()
 # Default values
 PROCESS_NAME = 'Client-Win64-Shipping.exe'
 WINDOW_NAME = 'Wuthering Waves'
-START_DATE = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 DPI_SCALING = user32.GetDpiForWindow(user32.GetForegroundWindow()) / 96.0
-INVENTORY = dict()
+INVENTORY = {'date': str(), 'items': dict()}
 FAILED: list[dict] = list()
-CHARACTERS = dict()
 maxLength = 12
 
 
@@ -114,12 +112,13 @@ class Config(QConfig):
 	scanEchoes = ConfigItem("Scanner", "ScanEchoes", False, BoolValidator())
 	scanDevItems = ConfigItem("Scanner", "ScanDevItems", False, BoolValidator())
 	scanResources = ConfigItem("Scanner", "ScanResources", False, BoolValidator())
+	scanAchievements = ConfigItem("Scanner", "scanAchievements", False, BoolValidator())
 
 	# TControlPanel settings
 	echoMinRarity = ConfigItem("Scanner", "EchoMinRarity", 1, RangeValidator(1, 5))
-	echoMinLevel = ConfigItem("Scanner", "EchoMinLevel", 0, RangeValidator(0, 90))
+	echoMinLevel = ConfigItem("Scanner", "EchoMinLevel", 0, RangeValidator(0, 25))
 	weaponsMinRarity = ConfigItem("Scanner", "WeaponsMinRarity", 1, RangeValidator(1, 5))
-	weaponsMinLevel = ConfigItem("Scanner", "WeaponsMinLevel", 0, RangeValidator(0, 90))
+	weaponsMinLevel = ConfigItem("Scanner", "WeaponsMinLevel", 1, RangeValidator(1, 90))
 
 # Application metadata
 HELP_URL = "https://t.me/psycho_marcus"

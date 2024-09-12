@@ -1,145 +1,152 @@
+import os
+import cv2
 import time
 import pytesseract
-import pydirectinput
 import numpy as np
 
 from scraping.utils import itemsID
-from scraping.utils import scaleWidth, scaleHeight, screenshot
-from properties.config import cfg
+from scraping.utils import (
+    scaleWidth, scaleHeight, screenshot,
+    mouseScroll, leftClick, presskey
+)
+from properties.config import cfg, basePATH
 
-def itemsScraper(
-	x: int,
-	y: int,
-	WIDTH: int,
-	HEIGHT: int
-):
-	inventory = dict()
-	failed = list()
+# Constants
+ROWS, COLS = 4, 6
 
-	pydirectinput.press(cfg.get(cfg.inventoryKeybind))
-	time.sleep(2)
-	
-	pydirectinput.leftClick(x=x, y=y)
-	time.sleep(.5)
+class Coordinates:
+    def __init__(self, x: int, y: int, w: int, h: int):
+        self.x = x
+        self.y = y
+        self.w = w
+        self.h = h
 
-	xName, yName, wName, hName = (
-		scaleWidth(1305, WIDTH),
-		scaleHeight(116, HEIGHT),
-		scaleWidth(545, WIDTH),
-		scaleHeight(55, HEIGHT)
-	)
-	xValue, yValue, wValue, hValue = (
-		scaleWidth(1655, WIDTH),
-		scaleHeight(320, HEIGHT),
-		scaleWidth(190, WIDTH),
-		scaleHeight(40, HEIGHT)
-	)
+class ROI_Info:
+    def __init__(self, width: int, height: int, coords: dict[str, Coordinates]):
+        self.width = width
+        self.height = height
+        self.coords = coords
 
-	xDescription, yDescription, wDescription, hDescription = (
-		scaleWidth(1296, WIDTH),
-		scaleHeight(114, HEIGHT),
-		scaleWidth(558, WIDTH),
-		scaleHeight(820, HEIGHT)
-	)
+def scaleCoordinates(coords: dict[str, tuple[int, int, int, int]], width: int, height: int) -> dict[str, Coordinates]:
+    return {
+        key: Coordinates(
+            scaleWidth(x, width),
+            scaleHeight(y, height),
+            scaleWidth(w, width),
+            scaleHeight(h, height)
+        )
+        for key, (x, y, w, h) in coords.items()
+    }
 
-	x_start, y_start = (
-		scaleWidth(205, WIDTH),
-		scaleHeight(122, HEIGHT)
-	)
-	w, h = (
-		scaleWidth(151, WIDTH),
-		scaleHeight(181, HEIGHT)
-	)
+def getROI(width: int, height: int) -> ROI_Info:
+    unscaled_coords = {
+        'name': (1305, 116, 545, 55),
+        'value': (1655, 320, 190, 40),
+        'description': (1296, 114, 558, 820),
+        'start': (205, 122, 151, 181),
+    }
+    return ROI_Info(width, height, scaleCoordinates(unscaled_coords, width, height))
 
-	# Space between rows and columns
-	dx = w + scaleWidth(16, WIDTH) # columns
-	dy = h + scaleHeight(24, HEIGHT) # rows
 
-	isDouble = False
-	encounters = dict()
-	last = str()
+def processItem(path: str, image: np.ndarray, roiInfo: ROI_Info) -> tuple[dict[str, int], list[dict]]:
+    inventory = {}
+    failed = []
+    coords = roiInfo.coords
 
-	while not isDouble:
-		for row in range(4):
-			for col in range(6):
-				x = np.ceil(x_start + (col*dx) - (col/2))
-				y = np.ceil(y_start + (row*dy) - (row/2))
+    name = pytesseract.image_to_string(image[coords['name'].y:coords['name'].y + coords['name'].h, coords['name'].x:coords['name'].x + coords['name'].w]).strip()
+    value_text = pytesseract.image_to_string(image[coords['value'].y:coords['value'].y + coords['value'].h, coords['value'].x:coords['value'].x + coords['value'].w]).strip().split(' ', 1)[1]
 
-				# Calculate center of rectangle
-				center_x = x + w // 2
-				center_y = y + h // 2
-				pydirectinput.leftClick(center_x, center_y)
-				time.sleep(.2)
-				
-				image = screenshot(0, 0, WIDTH, HEIGHT)
-		
-				name = pytesseract.image_to_string(image[yName:yName+hName, xName:xName+wName]).strip()
-				value = pytesseract.image_to_string(image[yValue:yValue+hValue, xValue:xValue+wValue]).strip().split(' ', 1)[1]
+    try:
+        value = int(value_text)
+    except ValueError:
+        value = 1
 
-				try: value = int(value)
-				except: value = 1
+    itemID = itemsID.get(name, {'id': None})['id']
+    if itemID is not None:
+        inventory[itemID] = value
+    else:
+        os.makedirs(path, exist_ok=True)
+        descImage = image[coords['description'].y:coords['description'].y + coords['description'].h, coords['description'].x:coords['description'].x + coords['description'].w]
 
-				maxEncounters = np.ceil(value/999)
-				
-				encounters[name] = encounters.get(name, 0) + 1
-				itemID = itemsID.get(name, {'id': None})['id']
-				if itemID is not None:
-					inventory[itemID] = value
-				else:
-					failed.append({
-						'image': np.ascontiguousarray(image[yDescription:yDescription+hDescription, xDescription:xDescription+wDescription]),
-						'owned': value
-					})
-				
-				if encounters[name] > maxEncounters:
-					last = name
-					isDouble = True
-					break
-			if isDouble: break
-		
-		if not isDouble:
-			pydirectinput.scroll(-31)
-			time.sleep(1.2)
+        imagePath = os.path.join(path, f'_{name}-{time.time()}.png')
+        cv2.imwrite(imagePath, descImage)
 
-	isDouble = False
+        failed.append({
+            'image': imagePath,
+            'owned': value
+        })
 
-	## LAST PAGE
-	for row in range(4 - 1, -1, -1):
-		for col in range(6 - 1, -1, -1):
-			y = np.ceil(y_start + (row*dy) - (row/2))
-			x = np.ceil(x_start + (col*dx) - (col/2))
+    return inventory, failed, name
 
-			# Calculate center of rectangle
-			center_x = x + w // 2
-			center_y = y + h // 2
-			pydirectinput.leftClick(center_x, center_y)
-			time.sleep(.2)
-			
-			image = screenshot(0, 0, WIDTH, HEIGHT)
-			
-			name = pytesseract.image_to_string(image[yName:yName+hName, xName:xName+wName]).strip()
-			value = pytesseract.image_to_string(image[yValue:yValue+hValue, xValue:xValue+wValue]).strip().split(' ', 1)[1]
+def itemsScraper(START_DATE: str, x: int, y: int, WIDTH: int, HEIGHT: int):
+    path = os.path.join(basePATH, 'logs', 'fail', START_DATE)
+    
+    inventory = {}
+    failed = []
+    encounters = {}
+    roiInfo = getROI(WIDTH, HEIGHT)
 
-			if name == last: continue
+    presskey(cfg.get(cfg.inventoryKeybind), 2, False)
+    leftClick(x, y)
 
-			try: value = int(value)
-			except: value = 1
+    isDouble = False
+    last = ""
 
-			maxEncounters = np.ceil(value/999)
-			
-			encounters[name] = encounters.get(name, 0) + 1
-			itemID = itemsID.get(name, {'id': None})['id']
+    while not isDouble:
+        for row in range(ROWS):
+            for col in range(COLS):
+                startCoords = roiInfo.coords['start']
+                center_x = startCoords.x + (col * (startCoords.w + scaleWidth(16, WIDTH))) + startCoords.w // 2
+                center_y = startCoords.y + (row * (startCoords.h + scaleHeight(24, HEIGHT))) + startCoords.h // 2
+                
+                leftClick(center_x, center_y)
+                image = screenshot(0, 0, WIDTH, HEIGHT)
+                
+                item_inventory, item_failed, name = processItem(path, image, roiInfo)
+                inventory.update(item_inventory)
+                failed.extend(item_failed)
 
-			if itemID is not None: inventory[itemID] = value
-			else:
-				failed.append({
-					'image': np.ascontiguousarray(image[yDescription:yDescription+hDescription, xDescription:xDescription+wDescription]),
-					'owned': value
-				})
-			
-			if encounters[name] > maxEncounters:
-				isDouble = True
-				break
-		if isDouble: break
-	
-	return (inventory, failed)
+                value = inventory.get(itemsID.get(name, {'id': None})['id'], 1)
+                maxEncounters = np.ceil(value / 999)
+                encounters[name] = encounters.get(name, 0) + 1
+
+                if encounters[name] > maxEncounters:
+                    last = name
+                    isDouble = True
+                    break
+            if isDouble:
+                break
+        
+        if not isDouble:
+            mouseScroll(-31.25, 1.2)
+
+    # Process last page
+    isDouble = False
+    for row in range(ROWS - 1, -1, -1):
+        for col in range(COLS - 1, -1, -1):
+            startCoords = roiInfo.coords['start']
+            center_x = startCoords.x + (col * (startCoords.w + scaleWidth(16, WIDTH))) + startCoords.w // 2
+            center_y = startCoords.y + (row * (startCoords.h + scaleHeight(24, HEIGHT))) + startCoords.h // 2
+            
+            leftClick(center_x, center_y)
+            image = screenshot(0, 0, WIDTH, HEIGHT)
+            
+            item_inventory, item_failed, name = processItem(path, image, roiInfo)
+            
+            if name == last:
+                continue
+
+            inventory.update(item_inventory)
+            failed.extend(item_failed)
+
+            value = inventory.get(itemsID.get(name, {'id': None})['id'], 1)
+            maxEncounters = np.ceil(value / 999)
+            encounters[name] = encounters.get(name, 0) + 1
+
+            if encounters[name] > maxEncounters:
+                isDouble = True
+                break
+        if isDouble:
+            break
+
+    return inventory, failed

@@ -1,14 +1,13 @@
-import numpy as np
-import mss
 import time
 import logging
-import cv2
 import pytesseract
 
 import properties.config
 from game.screenSize import WindowManager
 from game.foreground import WindowFocusManager
-from scraping.utils import pressEscape
+from scraping.utils import (
+    scaleWidth, scaleHeight, screenshot
+)
 
 logger = logging.getLogger('MainMenuController')
 
@@ -22,19 +21,15 @@ class MainMenuController:
         Returns:
             bool: True if the main menu is detected, False otherwise.
         """
-        screenshot_region = {
-            'left': int(140 / 1920 * WindowManager.getWidth()),
-            'top': int(45 / 1080 * WindowManager.getHeight()),
-            'width': int(140 / 1920 * WindowManager.getWidth()),
-            'height': int(30 / 1080 * WindowManager.getHeight())
-        }
-
         try:
-            with mss.mss() as sct:
-                screenshot = np.array(sct.grab(screenshot_region), dtype=np.uint8)
-                screenshot = cv2.cvtColor(screenshot, cv2.COLOR_BGR2RGB)
+            image = screenshot(
+                scaleWidth(140, WindowManager.getWidth()),
+                scaleHeight(45, WindowManager.getHeight()),
+                scaleWidth(140, WindowManager.getWidth()),
+                scaleHeight(30, WindowManager.getHeight())
+            )
 
-            result = pytesseract.image_to_string(screenshot).strip().lower()
+            result = pytesseract.image_to_string(image).strip().lower()
             logger.debug(f"Detected text from screenshot: '{result}'")
             
             return result in ['terminal', 'terminat']
@@ -64,7 +59,6 @@ class MainMenuController:
             if not self.isMenu():
                 return 'error', 'Error', 'Not in the main menu. Press ESC in-game and rerun the scanner.'
 
-            pressEscape()
             return '', '', ''
 
         except Exception as e:

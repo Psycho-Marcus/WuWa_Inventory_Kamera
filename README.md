@@ -15,21 +15,26 @@ The data format is specifically designed for [WuWa Tracker](https://wuwatracker.
   - English
 
 - **Features:**
+  - Scan Characters
+  - Scan Weapons
+  - Scan Echoes
   - Scan Development Items
   - Scan Resources
+  - Scan Achievements
   - Edit/View inventory data
 
 ## To-Do List
-- [ ] Character Scanner
-- [ ] Weapons Scanner
-- [ ] Echoes Scanner
-- [ ] Achievements Scanner
+- [x] Character Scanner (no echo)
+- [x] Weapons Scanner
+- [x] Echoes Scanner (really slow at the moment)
+- [x] Achievements Scanner
 - [ ] Auto Updater
 - [ ] Support for additional in-game languages
 - [ ] Support for more software languages
 - [ ] Improve text recognition accuracy
 - [ ] Improve logs
 - [ ] Optimize releases size
+- [ ] Rewrite the code (after all tasks are complete; this is urgently needed)
 
 ## Tutorial
 

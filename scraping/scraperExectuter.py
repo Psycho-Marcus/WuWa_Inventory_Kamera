@@ -11,6 +11,7 @@ def start():
             'echoes': cfg.get(cfg.scanEchoes),
             'devItems': cfg.get(cfg.scanDevItems),
             'resources': cfg.get(cfg.scanResources),
+            'achievements': cfg.get(cfg.scanAchievements),
         }
         enabled = [key for key, value in scanners.items() if value]
         if enabled:

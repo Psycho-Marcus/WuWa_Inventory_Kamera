@@ -5,7 +5,7 @@ import urllib.request
 import logging
 
 from properties.config import basePATH
-from scraping.utils import itemsID, charactersID, weaponsID
+from scraping.utils import itemsID, charactersID, weaponsID, echoesID, achievementsID
 
 logger = logging.getLogger('DatabaseManager')
 
@@ -22,6 +22,10 @@ class DataUpdater():
 			{
 				'folder': ['ConfigDB'],
 				'file': 'ItemInfo.json'
+			},
+			{
+				'folder': ['ConfigDB'],
+				'file': 'WeaponConf.json'
 			},
 		]
 		self.updated = False
@@ -75,6 +79,9 @@ class DataUpdater():
 				with open('./data/ItemInfo.json', 'r', encoding='utf-8') as f:
 					item_info = json.load(f)
 
+				with open('./data/WeaponConf.json', 'r', encoding='utf-8') as f:
+					weapon_info = json.load(f)
+
 				items = {
 					info_text[item['Name']]: {
 						'id': item['Id'],
@@ -82,11 +89,25 @@ class DataUpdater():
 					}
 					for item in item_info if item['Name'] in info_text
 				}
+				weapons = {
+					info_text[weapon['WeaponName']]: {
+						'id': weapon['ModelId'],
+						'rarity': weapon['QualityId'],
+						'image': os.path.join(basePATH, 'assets', weapon['Icon'].split('/Image/')[1].rsplit('.', 1)[0] + '.png')
+					}
+					for weapon in weapon_info if weapon['WeaponName'] in info_text
+				}
 
 				with open('./data/items.json', 'w', encoding='utf-8') as f:
 					json.dump(items, f, indent=4)
 
 				itemsID.update(items)
+
+				with open('./data/weapons.json', 'w', encoding='utf-8') as f:
+					json.dump(weapons, f, indent=4)
+
+				itemsID.update(items)
+				weaponsID.update(weapons)
 
 			except Exception as e:
 				logger.error(f"Failed to update items.json. Error: {str(e)}")
@@ -121,4 +142,5 @@ class DataUpdater():
 		self.update_files()
 		self.update_items()
 		self.update_data('characters', r'^RoleInfo_(\d+)_Name$')
-		self.update_data('weapons', r'^WeaponConf_(\d+)_WeaponName$')
+		self.update_data('echoes', r'^MonsterInfo_(\d+)_Name$')
+		self.update_data('achievements', r'^Achievement_(\d+)_Name$')

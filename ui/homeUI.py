@@ -1,6 +1,5 @@
 import os
 import logging
-from datetime import datetime
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap, QImage
@@ -16,7 +15,7 @@ from qfluentwidgets import (
 	ListWidget, PixmapLabel
 )
 
-from properties.config import cfg, FAILED, INVENTORY, START_DATE
+from properties.config import cfg, FAILED, INVENTORY
 from scraping.scraperExectuter import start
 from scraping.utils import itemsID, savingScraped
 
@@ -62,8 +61,7 @@ class HomeInterface(QWidget):
 
 			# Image on the left
 			image_label = PixmapLabel()
-			h, w, ch = FAILED[0]['image'].shape
-			image = QImage(FAILED[0]['image'].data, w, h, ch * w, QImage.Format.Format_RGB888)
+			image = QImage(FAILED[0]['image'])
 			pixmap = QPixmap.fromImage(image)
 			image_label.setPixmap(pixmap)
 			image_label.setScaledContents(True)
@@ -121,19 +119,28 @@ class HomeInterface(QWidget):
 
 	def onSkipButtonClicked(self):
 		"""Handle the Skip button click event."""
+		global FAILED
+
 		if FAILED:
+			try: os.remove(FAILED[0]['image'])
+			except: pass
+			
 			FAILED.pop(0)
 			self.updateUISignal.emit()
 
 	def onChangeButtonClicked(self):
 		"""Handle the Update button click event."""
-		global INVENTORY
+		global INVENTORY, FAILED
 
 		selected_item = self.list_widget.currentItem()
 		if selected_item:
 			item_id = itemsID.get(selected_item.text())['id']
-			INVENTORY[item_id] = self.owned_spinbox.value()
-			savingScraped()
+			INVENTORY['items'][item_id] = self.owned_spinbox.value()
+			savingScraped(START_DATE=INVENTORY['date'])
+		
+			if FAILED:
+				FAILED.pop(0)
+			
 			self.updateUISignal.emit()
 		else:
 			self.showNotification('warning', 'Warning', 'Select the item name from the list on the right side.')
@@ -204,7 +211,7 @@ class LControlPanel(QFrame):
 		self.scanEchoes = CheckBox('Echoes', self)
 		self.scanDevItems = CheckBox('Development Items', self)
 		self.scanResources = CheckBox('Resources', self)
-
+		self.scanAchievements = CheckBox('Achievements', self)  # New checkbox
 
 		self.closeLabel = BodyLabel("Press 'ENTER' to cancel the scan.")
 
@@ -220,8 +227,6 @@ class LControlPanel(QFrame):
 
 	def __setupLayout(self):
 		"""Setup the layout of the control panel."""
-		self.scanEchoes.setEnabled(False)
-		self.scanWeapons.setEnabled(False)
 
 		self.panelLayout.setSpacing(8)
 		self.panelLayout.setContentsMargins(14, 16, 14, 14)
@@ -233,6 +238,7 @@ class LControlPanel(QFrame):
 		self.panelLayout.addWidget(self.scanEchoes)
 		self.panelLayout.addWidget(self.scanDevItems)
 		self.panelLayout.addWidget(self.scanResources)
+		self.panelLayout.addWidget(self.scanAchievements)
 
 		self.panelLayout.addStretch()
 		self.panelLayout.addWidget(self.closeLabel)
@@ -248,6 +254,7 @@ class LControlPanel(QFrame):
 		self.scanEchoes.setChecked(cfg.scanEchoes.value)
 		self.scanDevItems.setChecked(cfg.scanDevItems.value)
 		self.scanResources.setChecked(cfg.scanResources.value)
+		self.scanAchievements.setChecked(cfg.scanAchievements.value)
 
 	def __connectSignals(self):
 		"""Connect signals to slots."""
@@ -256,6 +263,7 @@ class LControlPanel(QFrame):
 		self.scanEchoes.stateChanged.connect(self.onValueChanged)
 		self.scanCharacters.stateChanged.connect(self.onValueChanged)
 		self.scanWeapons.stateChanged.connect(self.onValueChanged)
+		self.scanAchievements.stateChanged.connect(self.onAchievementsToggled)
 
 	def onValueChanged(self):
 		"""Handle value changes in checkboxes."""
@@ -264,13 +272,38 @@ class LControlPanel(QFrame):
 		cfg.scanEchoes.value = self.scanEchoes.isChecked()
 		cfg.scanCharacters.value = self.scanCharacters.isChecked()
 		cfg.scanWeapons.value = self.scanWeapons.isChecked()
+
+		if self.scanCharacters.isChecked() or self.scanWeapons.isChecked() or \
+		   self.scanEchoes.isChecked() or self.scanDevItems.isChecked() or \
+		   self.scanResources.isChecked():
+			self.scanAchievements.setChecked(False)
+			self.scanAchievements.setDisabled(True)
+		else:
+			self.scanAchievements.setDisabled(False)
+
 		cfg.save()
+
+	def onAchievementsToggled(self):
+		"""Handle Achievements checkbox toggle event."""
+		if self.scanAchievements.isChecked():
+			self.setOtherCheckboxesEnabled(False)
+		else:
+			self.setOtherCheckboxesEnabled(True)
+
+		cfg.scanAchievements.value = self.scanAchievements.isChecked()
+		cfg.save()
+
+	def setOtherCheckboxesEnabled(self, enabled):
+		"""Enable or disable other checkboxes based on the state of Achievements."""
+		self.scanCharacters.setDisabled(not enabled)
+		self.scanWeapons.setDisabled(not enabled)
+		self.scanEchoes.setDisabled(not enabled)
+		self.scanDevItems.setDisabled(not enabled)
+		self.scanResources.setDisabled(not enabled)
 
 	def runScraper(self):
 		"""Run the scraper and emit notifications if needed."""
-		global START_DATE
 
-		START_DATE = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 		notification = start()
 		if notification:
 			logger.debug(f"Notification: {notification}")
@@ -306,12 +339,8 @@ class TControlPanel(QFrame):
 		"""Setup the layout of the top control panel."""
 		self.weaponsMinRarity.setRange(1, 5)
 		self.echoMinRarity.setRange(1, 5)
-		self.weaponsMinLevel.setRange(0, 90)
-		self.echoMinLevel.setRange(0, 90)
-		self.weaponsMinRarity.setEnabled(False)
-		self.weaponsMinLevel.setEnabled(False)
-		self.echoMinRarity.setEnabled(False)
-		self.echoMinLevel.setEnabled(False)
+		self.weaponsMinLevel.setRange(1, 90)
+		self.echoMinLevel.setRange(0, 25)
 
 		echoRarityLayout = QVBoxLayout()
 		echoRarityLabel = BodyLabel('Rarity', self)
