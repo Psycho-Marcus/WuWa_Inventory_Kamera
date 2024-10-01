@@ -21,54 +21,67 @@ class DataUpdaterThread(QThread):
 	def __init__(self):
 		super().__init__()
 		self.data_updater = DataUpdater()
+		logger.debug("DataUpdaterThread initialized")
 
 	def run(self):
-		self.data_updater.run()
-		self.update_finished.emit()
+		logger.info("Starting data update process")
+		try:
+			self.data_updater.run()
+			logger.info("Data update process completed successfully")
+		except Exception as e:
+			logger.error(f"Error during data update: {str(e)}", exc_info=True)
+		finally:
+			self.update_finished.emit()
+			logger.debug("Update finished signal emitted")
 
 class LoadingScreen(QWidget):
 	def __init__(self):
 		super().__init__()
+		logger.debug("Initializing LoadingScreen")
 		self.initWindow()
+		self.setupUI()
+		self.startDataUpdate()
 
-		# Set up layout
+	def initWindow(self):
+		logger.debug("Setting up window properties")
+		self.setFixedSize(1150, 700)
+		self.setWindowIcon(QIcon(os.path.join(basePATH, 'assets', 'icon.ico')))
+		self.setWindowTitle('WuWa Inventory Kamera')
+
+		desktop = QApplication.primaryScreen().availableGeometry()
+		self.move(desktop.width() // 2 - self.width() // 2, desktop.height() // 2 - self.height() // 2)
+		logger.info(f"Window positioned at {self.pos().x()}, {self.pos().y()}")
+
+	def setupUI(self):
+		logger.debug("Setting up UI components")
 		self.vBoxLayout = QVBoxLayout(self)
-
-		# Add a spacer at the top to push content to the center
 		self.vBoxLayout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
 
-		# Add the spinner (progress ring)
 		self.spinner = IndeterminateProgressRing(self)
 		self.spinner.setFixedSize(200, 200)
 		self.spinner.setStrokeWidth(8)
 		self.vBoxLayout.addWidget(self.spinner, 0, Qt.AlignHCenter)
 
-		# Add the label below the spinner
 		self.label = BodyLabel("Loading, please wait...", self)
 		self.label.setStyleSheet("color: white; font-size: 18px;")
 		self.label.setAlignment(Qt.AlignCenter)
 		self.vBoxLayout.addWidget(self.label, 0, Qt.AlignHCenter)
 
-		# Add another spacer at the bottom to balance the layout
 		self.vBoxLayout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
+		logger.info("UI setup completed")
 
-		# Start the data updater thread
+	def startDataUpdate(self):
+		logger.info("Initializing and starting data update thread")
 		self.data_updater_thread = DataUpdaterThread()
 		self.data_updater_thread.update_finished.connect(self.on_update_finished)
 		self.data_updater_thread.start()
 
-	def initWindow(self):
-		"""Initialize window settings including size, icon, and title."""
-		self.setFixedSize(1150, 700)
-		self.setWindowIcon(QIcon(os.path.join(basePATH, 'assets', 'icon.ico')))
-		self.setWindowTitle('WuWa Inventory Kamera')
-
-		# Center the window on the screen
-		desktop = QApplication.primaryScreen().availableGeometry()
-		self.move(desktop.width() // 2 - self.width() // 2, desktop.height() // 2 - self.height() // 2)
-
 	def on_update_finished(self):
-		# Close the loading screen and open the main application
+		logger.info("Data update finished, transitioning to main window")
 		self.close()
-		self.main_window = WuWaInventoryKamera()
-		self.main_window.show()
+		try:
+			self.main_window = WuWaInventoryKamera()
+			self.main_window.show()
+			logger.info("Main window displayed successfully")
+		except Exception as e:
+			logger.error(f"Error initializing main window: {str(e)}", exc_info=True)

@@ -28,12 +28,10 @@ class ItemCard(CardWidget):
 		self.itemName = name
 		self.quantity = quantity
 
-		# Initialize Widgets
 		self.imageLabel = BodyLabel(self)
 		self.nameLabel = StrongBodyLabel(name if len(name) < 19 else name[:16] + '...', self)
 		self.quantityLineEdit = LineEdit(self)
 		
-		# Set up the widgets
 		self.setupQuantityLineEdit(quantity)
 		self.setupImage(image_path)
 		self.setupLayout()
@@ -89,7 +87,6 @@ class InventoryInterface(ScrollArea):
 		self.scrollWidget.setStyleSheet("background: transparent;")
 		self.mainLayout = QVBoxLayout(self.scrollWidget)
 
-		# Initialize inventory group and cards
 		self.inventoryGroup = SettingCardGroup(self.tr("Inventory"), self.scrollWidget)
 		self.inventoryFileCard = MultiplePushSettingCard(
 			[self.tr('Load file'), self.tr('Save file')],
@@ -182,7 +179,7 @@ class InventoryInterface(ScrollArea):
 
 	def _getItemInfoByID(self, item_id: int):
 		"""Retrieve item image and name by its ID."""
-		for name, info in itemsID.items():
+		for _, info in itemsID.items():
 			if info['id'] == int(item_id):
-				return info['image'], name
+				return info['image'], info['name']
 		return 'None', 'None'

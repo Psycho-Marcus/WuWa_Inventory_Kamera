@@ -1,13 +1,15 @@
 import os
+import re
 import cv2
 import time
-import pytesseract
 import numpy as np
+from difflib import get_close_matches
 
 from scraping.utils import itemsID
 from scraping.utils import (
     scaleWidth, scaleHeight, screenshot,
-    mouseScroll, leftClick, presskey
+    mouseScroll, leftClick, presskey,
+    imageToString, convertToBlackWhite
 )
 from properties.config import cfg, basePATH
 
@@ -40,24 +42,35 @@ def scaleCoordinates(coords: dict[str, tuple[int, int, int, int]], width: int, h
 
 def getROI(width: int, height: int) -> ROI_Info:
     unscaled_coords = {
-        'name': (1305, 116, 545, 55),
-        'value': (1655, 320, 190, 40),
+        'info': (1296, 114, 558, 278),
         'description': (1296, 114, 558, 820),
         'start': (205, 122, 151, 181),
     }
     return ROI_Info(width, height, scaleCoordinates(unscaled_coords, width, height))
 
 
-def processItem(path: str, image: np.ndarray, roiInfo: ROI_Info) -> tuple[dict[str, int], list[dict]]:
+def processItem(path: str, image: np.ndarray, roiInfo: ROI_Info, _cache: dict) -> tuple[dict[str, int], list[dict]]:
     inventory = {}
     failed = []
     coords = roiInfo.coords
 
-    name = pytesseract.image_to_string(image[coords['name'].y:coords['name'].y + coords['name'].h, coords['name'].x:coords['name'].x + coords['name'].w]).strip()
-    value_text = pytesseract.image_to_string(image[coords['value'].y:coords['value'].y + coords['value'].h, coords['value'].x:coords['value'].x + coords['value'].w]).strip().split(' ', 1)[1]
+    infoImage = image[coords['info'].y:coords['info'].y + coords['info'].h, coords['info'].x:coords['info'].x + coords['info'].w]
+    infoImage = convertToBlackWhite(infoImage)
+    infoHash = hash(infoImage.tobytes())
+
+    if infoHash in _cache:
+        info = _cache[infoHash]
+    else:
+        info = imageToString(infoImage, bannedChars=' ').lower().split('\n')
+        _cache[infoHash] = info
+    name = info[0]
+    result = get_close_matches(name, itemsID, 1, 0.9)
+    if result: name = result[0]
+    
+    value = re.sub(r'[^0-9]', '', info[2])
 
     try:
-        value = int(value_text)
+        value = int(value)
     except ValueError:
         value = 1
 
@@ -81,9 +94,10 @@ def processItem(path: str, image: np.ndarray, roiInfo: ROI_Info) -> tuple[dict[s
 def itemsScraper(START_DATE: str, x: int, y: int, WIDTH: int, HEIGHT: int):
     path = os.path.join(basePATH, 'logs', 'fail', START_DATE)
     
-    inventory = {}
-    failed = []
-    encounters = {}
+    inventory = dict()
+    failed = list()
+    encounters = dict()
+    _cache = dict()
     roiInfo = getROI(WIDTH, HEIGHT)
 
     presskey(cfg.get(cfg.inventoryKeybind), 2, False)
@@ -100,9 +114,9 @@ def itemsScraper(START_DATE: str, x: int, y: int, WIDTH: int, HEIGHT: int):
                 center_y = startCoords.y + (row * (startCoords.h + scaleHeight(24, HEIGHT))) + startCoords.h // 2
                 
                 leftClick(center_x, center_y)
-                image = screenshot(0, 0, WIDTH, HEIGHT)
+                image = screenshot(width=WIDTH, height=HEIGHT)
                 
-                item_inventory, item_failed, name = processItem(path, image, roiInfo)
+                item_inventory, item_failed, name = processItem(path, image, roiInfo, _cache)
                 inventory.update(item_inventory)
                 failed.extend(item_failed)
 
@@ -129,9 +143,9 @@ def itemsScraper(START_DATE: str, x: int, y: int, WIDTH: int, HEIGHT: int):
             center_y = startCoords.y + (row * (startCoords.h + scaleHeight(24, HEIGHT))) + startCoords.h // 2
             
             leftClick(center_x, center_y)
-            image = screenshot(0, 0, WIDTH, HEIGHT)
+            image = screenshot(width=WIDTH, height=HEIGHT)
             
-            item_inventory, item_failed, name = processItem(path, image, roiInfo)
+            item_inventory, item_failed, name = processItem(path, image, roiInfo, _cache)
             
             if name == last:
                 continue
@@ -148,5 +162,6 @@ def itemsScraper(START_DATE: str, x: int, y: int, WIDTH: int, HEIGHT: int):
                 break
         if isDouble:
             break
-
+    
+    del _cache
     return inventory, failed

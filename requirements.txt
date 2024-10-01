@@ -1,6 +1,6 @@
 pyuac
 PySide6-Fluent-Widgets
-pytesseract
+rapidocr-onnxruntime
 mss
 opencv-python
 pygetwindow

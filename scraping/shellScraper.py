@@ -1,10 +1,9 @@
 import logging
 import string
-import pytesseract
 
 from scraping.utils import (
 	scaleWidth, scaleHeight, screenshot,
-	convertToBlackWhite
+	imageToString
 )
 
 logger = logging.getLogger('ShellScraper')
@@ -13,17 +12,16 @@ def getShell(WIDTH, HEIGHT):
 
 	xShell, yShell, wShell, hShell = (
 		scaleWidth(1255, WIDTH),
-		scaleHeight(45, HEIGHT),
-		scaleWidth(145, WIDTH),
-		scaleHeight(35, HEIGHT)
+		scaleHeight(38, HEIGHT),
+		scaleWidth(165, WIDTH),
+		scaleHeight(50, HEIGHT)
 	)
 
-	image = screenshot(0, 0, WIDTH, HEIGHT)
-	bw = convertToBlackWhite(image[yShell:yShell+hShell, xShell:xShell+wShell])
+	image = screenshot(xShell, yShell, wShell, hShell, True)
 
-	try: shell = int(pytesseract.image_to_string(bw, config=f'--psm 7 -c tessedit_char_whitelist={string.digits}').strip())
-	except: 
-		logger.debug("Failed to get shells. Error: ", exc_info=True)
+	try: shell = int(imageToString(image, allowedChars=string.digits).strip())
+	except Exception as e:
+		logger.debug(f'Failed to get shells. Error: {e}', exc_info=True)
 		shell = 0
 
 	return {'2': shell}

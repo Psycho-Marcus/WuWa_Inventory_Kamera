@@ -3,144 +3,219 @@ import re
 import json
 import urllib.request
 import logging
+from dataclasses import dataclass
 
 from properties.config import basePATH
-from scraping.utils import itemsID, charactersID, weaponsID, echoesID, achievementsID
+from scraping.utils import (
+	itemsID, charactersID, weaponsID,
+	echoesID, achievementsID, echoStats,
+	definedText
+)
 
 logger = logging.getLogger('DatabaseManager')
 
-class DataUpdater():
+@dataclass
+class FileConfig:
+	folder: list[str]
+	file: str
+
+class DataUpdater:
+	API = 'https://api.github.com/repos/{owner}/{repo}/contents/{path}'
+	
 	def __init__(self):
-		self.API = 'https://api.github.com/repos/{owner}/{repo}/contents/{path}'
 		self.author = 'Dimbreath'
 		self.repo = 'WutheringData'
 		self.files = [
-			{
-				'folder': ['TextMap', 'en'],
-				'file': 'MultiText.json'
-			},
-			{
-				'folder': ['ConfigDB'],
-				'file': 'ItemInfo.json'
-			},
-			{
-				'folder': ['ConfigDB'],
-				'file': 'WeaponConf.json'
-			},
+			FileConfig(['TextMap', 'en'], 'MultiText.json'),
+			FileConfig(['ConfigDB'], 'ItemInfo.json'),
+			FileConfig(['ConfigDB'], 'WeaponConf.json'),
 		]
 		self.updated = False
 
-	def _make_folder(self):
-		"""Create the data directory if it does not exist."""
-		if not os.path.isdir(os.path.join(basePATH, 'data')):
-			os.makedirs('data')
-			logger.debug("Created 'data' directory.")
+	def makeFolder(self):
+		os.makedirs('data', exist_ok=True)
+		logger.debug("Ensured 'data' directory exists.")
 
-	def _fetch_file_data(self, url):
-		"""Fetch the file data from the given URL."""
-		request = urllib.request.Request(url)
-		with urllib.request.urlopen(request) as response:
-			content = response.read().decode()
-			return json.loads(content)
+	def fetchFileData(self, url: str) -> dict:
+		with urllib.request.urlopen(urllib.request.Request(url)) as response:
+			return json.loads(response.read().decode())
 
-	def update_files(self):
-		"""Check and update files from the remote API."""
-		for paths in self.files:
+	def updateFiles(self):
+		for fileConfig in self.files:
 			url = self.API.format(
 				owner=self.author,
 				repo=self.repo,
-				path='/'.join(paths['folder'] + [paths['file']])
+				path='/'.join(fileConfig.folder + [fileConfig.file])
 			)
 
-			logger.info(f"Checking for updates on file: {paths['file']}")
+			logger.info(f'Checking for updates on file: {fileConfig.file}')
 			try:
-				data = self._fetch_file_data(url)
-				file_path = f'./data/{paths["file"]}'
+				data = self.fetchFileData(url)
+				filePath = f'./data/{fileConfig.file}'
 
-				current_size = os.path.getsize(file_path) if os.path.isfile(file_path) else 0
+				currentSize = os.path.getsize(filePath) if os.path.isfile(filePath) else 0
 
-				if data['size'] != current_size:
-					logger.info(f"Downloading updated version of {paths['file']}...")
-					urllib.request.urlretrieve(data['download_url'], file_path)
+				if data['size'] != currentSize:
+					logger.info(f'Downloading updated version of {fileConfig.file}...')
+					urllib.request.urlretrieve(data['download_url'], filePath)
 					self.updated = True
-					logger.info(f"File updated: {paths['file']}")
+					logger.info(f'File updated: {fileConfig.file}')
 					
 			except Exception as e:
-				logger.error(f"Failed to update {paths['file']}. Error: {str(e)}")
+				logger.error(f'Failed to update {fileConfig.file}. Error: {str(e)}')
 
-	def update_items(self):
-		"""Update items.json based on MultiText.json and ItemInfo.json."""
+	def loadJson(self, filename: str) -> dict:
+		with open(f'./data/{filename}', 'r', encoding='utf-8') as f:
+			return json.load(f)
+
+	def saveJson(self, data: dict, filename: str):
+		with open(f'./data/{filename}', 'w', encoding='utf-8') as f:
+			json.dump(data, f, indent=4)
+
+	def updateItems(self):
 		if self.updated or not os.path.isfile('./data/items.json'):
-			logger.info("Updating items.json...")
+			logger.info('Updating items.json...')
 			try:
-				with open('./data/MultiText.json', 'r', encoding='utf-8') as f:
-					info_text = json.load(f)
-
-				with open('./data/ItemInfo.json', 'r', encoding='utf-8') as f:
-					item_info = json.load(f)
-
-				with open('./data/WeaponConf.json', 'r', encoding='utf-8') as f:
-					weapon_info = json.load(f)
+				infoText = self.loadJson('MultiText.json')
+				itemInfo = self.loadJson('ItemInfo.json')
+				weaponInfo = self.loadJson('WeaponConf.json')
 
 				items = {
-					info_text[item['Name']]: {
+					infoText[item['Name']].lower().replace(' ', ''): {
 						'id': item['Id'],
+						'name': infoText[item['Name']],
 						'image': os.path.join(basePATH, 'assets', item['Icon'].split('/Image/')[1].rsplit('.', 1)[0] + '.png')
 					}
-					for item in item_info if item['Name'] in info_text
+					for item in itemInfo if item['Name'] in infoText
 				}
 				weapons = {
-					info_text[weapon['WeaponName']]: {
+					infoText[weapon['WeaponName']].lower().replace(' ', ''): {
 						'id': weapon['ModelId'],
+						'name': infoText[weapon['WeaponName']],
 						'rarity': weapon['QualityId'],
 						'image': os.path.join(basePATH, 'assets', weapon['Icon'].split('/Image/')[1].rsplit('.', 1)[0] + '.png')
 					}
-					for weapon in weapon_info if weapon['WeaponName'] in info_text
+					for weapon in weaponInfo if weapon['WeaponName'] in infoText
 				}
 
-				with open('./data/items.json', 'w', encoding='utf-8') as f:
-					json.dump(items, f, indent=4)
-
-				itemsID.update(items)
-
-				with open('./data/weapons.json', 'w', encoding='utf-8') as f:
-					json.dump(weapons, f, indent=4)
+				self.saveJson(items, 'items.json')
+				self.saveJson(weapons, 'weapons.json')
 
 				itemsID.update(items)
 				weaponsID.update(weapons)
 
 			except Exception as e:
-				logger.error(f"Failed to update items.json. Error: {str(e)}")
+				logger.error(f'Failed to update items.json. Error: {str(e)}')
 
-	def update_data(self, data_type, pattern_str):
-		"""Update json file based on MultiText.json."""
-		file_name = f'./data/{data_type}.json'
-		if self.updated or not os.path.isfile(file_name):
-			logger.info(f"Updating {data_type}.json...")
+	def updateJsonFromPattern(self, fileName: str, pattern: str, transformFunc):
+		if self.updated or not os.path.isfile(fileName):
+			logger.info(f'Updating {fileName}...')
 			try:
-				with open('./data/MultiText.json', 'r', encoding='utf-8') as f:
-					info_text = json.load(f)
-
-				pattern = re.compile(pattern_str)
-				data = {
-					info_text[key]: int(match.group(1))
-					for key in info_text
-					if (match := pattern.match(key))
-				}
-
-				with open(file_name, 'w', encoding='utf-8') as f:
-					json.dump(data, f, indent=4)
+				infoText = self.loadJson('MultiText.json')
 				
-				globals()[f"{data_type}ID"].update(data)
+				data = {}
+				compiledPattern = re.compile(pattern)
+				for key in infoText:
+					if match := compiledPattern.match(key):
+						transformed = transformFunc(infoText[key], match)
+						if transformed is not None:
+							data[transformed] = int(match.group(1))
 
+				self.saveJson(data, fileName)
+				return data
 			except Exception as e:
-				logger.error(f"Failed to update {file_name}. Error: {str(e)}")
+				logger.error(f'Failed to update {fileName}. Error: {str(e)}')
+
+	def updateCharacters(self):
+		data = self.updateJsonFromPattern(
+			'characters.json',
+			r'^RoleInfo_(\d+)_Name$',
+			lambda text, match: text.lower().replace(' ', '') if int(match.group(1)) < 5000 else None
+		)
+		if data:
+			charactersID.update(data)
+
+	def updateEcho(self):
+		data = self.updateJsonFromPattern(
+			'echoes.json',
+			r'^MonsterInfo_(\d+)_Name$',
+			lambda text, match: text.lower().replace(' ', '') if int(match.group(1)) < 350000000 else None
+		)
+		if data:
+			echoesID.update(data)
+
+	def updateAchievements(self):
+		data = self.updateJsonFromPattern(
+			'achievements.json',
+			r'^Achievement_(\d+)_Name$',
+			lambda text, _: text
+		)
+		if data:
+			achievementsID.update(data)
+
+	def updateEchoStats(self):
+		statsKey = {
+			'PropertyIndex_10003_Name': 'hp',
+			'PropertyIndex_10007_Name': 'atk',
+			'PropertyIndex_10008_Name': 'cr',
+			'PropertyIndex_10009_Name': 'cd',
+			'PropertyIndex_10010_Name': 'def',
+			'PropertyIndex_10011_Name': 'er',
+			'PropertyIndex_10014_Name': 'skillDmg',
+			'PropertyIndex_10017_Name': 'basicAttack',
+			'PropertyIndex_10018_Name': 'heavyAttack',
+			'PropertyIndex_10019_Name': 'liberationDmg',
+			'PropertyIndex_10022_Name': 'glacio',
+			'PropertyIndex_10023_Name': 'fusion',
+			'PropertyIndex_10024_Name': 'electro',
+			'PropertyIndex_10025_Name': 'aero',
+			'PropertyIndex_10026_Name': 'spectro',
+			'PropertyIndex_10027_Name': 'havoc',
+			'PropertyIndex_10035_Name': 'healing'
+		}
+
+		try:
+			infoText = self.loadJson('MultiText.json')
+			
+			stats = {infoText[key].lower().replace(' ', '').replace('.', ''): value
+					 for key, value in statsKey.items()}
+			
+			self.saveJson(stats, 'echoStats.json')
+			echoStats.update(stats)
+			
+		except Exception as e:
+			logger.error(f'Failed to update echoStats. Error: {str(e)}')
+
+	def updateDefinedText(self):
+		textKey = [
+			'PrefabTextItem_1547656443_Text', # Terminal
+			'PrefabTextItem_2954494437_Text', # Complete
+			'PrefabTextItem_2829957711_Text', # Ongoing
+			'PrefabTextItem_128820487_Text', # Claim
+			'PrefabTextItem_Activate_Text', # Activate
+			'PrefabtextItem_Rogueskilltree_Max', # Activated
+			'SkillType_4_TypeName', # Inherent Skill
+			'VisionSkillTitle' # Echo Skill
+		]
+
+		try:
+			infoText = self.loadJson('MultiText.json')
+			
+			stats = [infoText[key].lower().replace(' ', '').replace('-', '').strip()
+					 for key in textKey]
+			
+			self.saveJson(stats, 'definedText.json')
+			definedText.extend(stats)
+			
+		except Exception as e:
+			logger.error(f'Failed to update definedText. Error: {str(e)}')
 
 	def run(self):
-		"""Run the data update process."""
-		self._make_folder()
-		self.update_files()
-		self.update_items()
-		self.update_data('characters', r'^RoleInfo_(\d+)_Name$')
-		self.update_data('echoes', r'^MonsterInfo_(\d+)_Name$')
-		self.update_data('achievements', r'^Achievement_(\d+)_Name$')
+		self.makeFolder()
+		self.updateFiles()
+		self.updateItems()
+		self.updateEchoStats()
+		self.updateDefinedText()
+		self.updateAchievements()
+		self.updateCharacters()
+		self.updateEcho()

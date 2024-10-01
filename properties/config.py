@@ -2,9 +2,8 @@ import sys
 import os
 import string
 import ctypes
-from datetime import datetime
 
-import pytesseract
+from rapidocr_onnxruntime import RapidOCR
 from qfluentwidgets import (
 	qconfig, QConfig, ConfigValidator,
 	ConfigItem, OptionsConfigItem, BoolValidator,
@@ -14,6 +13,7 @@ from qfluentwidgets import (
 
 user32 = ctypes.windll.user32
 basePATH = getattr(sys, 'frozen', False) and sys._MEIPASS or os.getcwd()
+ocr = RapidOCR()
 
 # Default values
 PROCESS_NAME = 'Client-Win64-Shipping.exe'
@@ -99,7 +99,6 @@ class Config(QConfig):
 
 	# Configuration items
 	exportFolder = ConfigItem("Folders", "Export", "export", FolderValidator())
-	tesseractFolder = ConfigItem("Folders", "Tesseract", os.path.join(basePATH, 'Tesseract-OCR'), FolderValidator())
 	checkUpdateAtStartUp = ConfigItem("Update", "CheckUpdateAtStartUp", True, BoolValidator())
 	gameLanguages = OptionsConfigItem('InGame', 'Language', 'English', OptionsValidator(['English']))
 	inventoryKeybind = OptionsConfigItem('InGame', 'InventoryKeybind', 'B', OptionsValidator(alphabethList()))
@@ -128,6 +127,3 @@ RELEASE_URL = "https://github.com/Psycho-Marcus/WuWa_Inventory_Kamera/releases/l
 # Load configuration
 cfg = Config()
 qconfig.load('config/config.json', cfg)
-
-# Tesseract path
-pytesseract.pytesseract.tesseract_cmd = os.path.join(cfg.get(cfg.tesseractFolder), 'tesseract.exe')

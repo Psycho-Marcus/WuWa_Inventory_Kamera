@@ -1,7 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.win32 import versioninfo as vi
+from pathlib import Path
+import importlib.util
 
-version = (1, 4, 2, 0)
+version = (1, 5, 4, 0)
 
 version_file = vi.VSVersionInfo(
     ffi=vi.FixedFileInfo(
@@ -30,13 +32,45 @@ version_file = vi.VSVersionInfo(
     ]
 )
 
+def check_package_exists(package_name):
+    package_spec = importlib.util.find_spec(package_name)
+    return package_spec is not None
+
+if check_package_exists('rapidocr_onnxruntime'):
+    package_name = 'rapidocr_onnxruntime'
+    package = __import__(package_name)
+    install_dir = Path(package.__file__).resolve().parent
+
+    file_paths = {
+        'onnx': list(install_dir.rglob('*.onnx')),
+        'txt': list(install_dir.rglob('*.txt')),
+        'yaml': list(install_dir.rglob('*.yaml'))
+    }
+
+    add_data = []
+    for ext in ['onnx', 'txt']:
+        for path in file_paths[ext]:
+            rel_dir = path.parent.relative_to(install_dir)
+            add_data.append((str(path.parent), f'{package_name}/{rel_dir}'))
+
+    for path in file_paths['yaml']:
+        rel_dir = path.parent.relative_to(install_dir)
+        if rel_dir == Path('.'):
+            add_data.append((str(path.parent / '*.yaml'), package_name))
+        else:
+            add_data.append((str(path.parent / '*.yaml'), f'{package_name}/{rel_dir}'))
+
+    add_data = list(set(add_data))
+else:
+    add_data = []
+
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
     datas=[
         ('assets', 'assets'),
-        ('Tesseract-OCR', 'Tesseract-OCR'),
+        *add_data
     ],
     hiddenimports=[],
     hookspath=[],

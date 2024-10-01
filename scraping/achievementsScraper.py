@@ -1,14 +1,12 @@
-import string
 import pyperclip
-import pytesseract
 import numpy as np
 
 from scraping.utils import achievementsID
 from scraping.utils import (
     scaleWidth, scaleHeight, screenshot,
-    leftClick, presskey, hotkey
+    imageToString, convertToBlackWhite, leftClick,
+    presskey, hotkey
 )
-from properties.config import cfg
 
 class Coordinates:
     def __init__(self, x: int, y: int, w: int, h: int):
@@ -45,28 +43,24 @@ def getROI(width: int, height: int) -> ROI_Info:
     }
     return ROI_Info(width, height, scaleCoordinates(unscaled_coords, width, height))
 
-def processAchievement(image: np.ndarray, roiInfo: ROI_Info, achievementName: str) -> str | None:
+def processAchievement(image: np.ndarray, roiInfo: ROI_Info, achievementName: str, _cache: dict) -> str | None:
     coords = roiInfo.coords
-    notFoundText = pytesseract.image_to_string(
-        image[coords['notFound'].y:coords['notFound'].y + coords['notFound'].h, 
-              coords['notFound'].x:coords['notFound'].x + coords['notFound'].w],
-        config='--psm 7'
-    ).translate(str.maketrans('', '', string.digits + string.punctuation)).strip().lower()
+    statusImage = image[coords['status'].y:coords['status'].y + coords['status'].h, coords['status'].x:coords['status'].x + coords['status'].w]
+    statusImage = convertToBlackWhite(statusImage)
+    statusHash = hash(statusImage.tobytes())
+    if statusHash in _cache: statusText = _cache[statusHash]
+    else:
+        statusText = imageToString(statusImage).lower()
+        _cache[statusHash] = statusText
 
-    if notFoundText != 'no search result':
-        statusText = pytesseract.image_to_string(
-            image[coords['status'].y:coords['status'].y + coords['status'].h, 
-                  coords['status'].x:coords['status'].x + coords['status'].w],
-            config=f'--psm 7 -c tessedit_char_whitelist={string.ascii_letters}'
-        ).strip().lower()
-
-        if statusText != 'ongoing':
-            return achievementsID[achievementName]
+    if statusText == 'claim' or '/' in statusText: # MULTILANG
+        return achievementsID[achievementName]
     
     return None
 
 def achievementScraper(WIDTH: int, HEIGHT: int) -> list[str]:
     achievements = []
+    _cache = dict()
     roiInfo = getROI(WIDTH, HEIGHT)
 
     presskey('esc', 1)
@@ -77,14 +71,15 @@ def achievementScraper(WIDTH: int, HEIGHT: int) -> list[str]:
         pyperclip.copy(achievementName)
         leftClick(roiInfo.coords['searchBar'].x, roiInfo.coords['searchBar'].y, .3)
         hotkey('ctrl', 'v', waitTime=.3)
-        leftClick(roiInfo.coords['searchButton'].x, roiInfo.coords['searchButton'].y, .3)
+        leftClick(roiInfo.coords['searchButton'].x, roiInfo.coords['searchButton'].y, .6)
 
         image = screenshot(width=WIDTH, height=HEIGHT)
-        achievement = processAchievement(image, roiInfo, achievementName)
+        achievement = processAchievement(image, roiInfo, achievementName, _cache)
         if achievement:
             achievements.append(achievement)
         
-        leftClick(roiInfo.coords['searchButton'].x, roiInfo.coords['searchButton'].y, .3)
+        leftClick(roiInfo.coords['searchButton'].x, roiInfo.coords['searchButton'].y)
     
     presskey('esc', .5)
+    del _cache
     return achievements

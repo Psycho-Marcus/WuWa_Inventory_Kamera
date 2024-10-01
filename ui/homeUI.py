@@ -16,7 +16,7 @@ from qfluentwidgets import (
 )
 
 from properties.config import cfg, FAILED, INVENTORY
-from scraping.scraperExectuter import start
+from scraping.scraperExectuter import startScraper
 from scraping.utils import itemsID, savingScraped
 
 logger = logging.getLogger('HomeInterface')
@@ -39,7 +39,6 @@ class HomeInterface(QWidget):
 		self.rightSide.addWidget(self.tControlPanel)
 		self.rightSide.addWidget(self.rightWidget)
 
-		# Set up layout
 		self.hBoxLayout = QHBoxLayout(self)
 		self.hBoxLayout.addWidget(self.lControlPanel, 0)
 		self.hBoxLayout.addLayout(self.rightSide, 1)
@@ -59,7 +58,6 @@ class HomeInterface(QWidget):
 
 			mainLayout = QHBoxLayout()
 
-			# Image on the left
 			image_label = PixmapLabel()
 			image = QImage(FAILED[0]['image'])
 			pixmap = QPixmap.fromImage(image)
@@ -68,11 +66,9 @@ class HomeInterface(QWidget):
 			image_label.setFixedSize(279, 407)
 			mainLayout.addWidget(image_label)
 
-			# Middle layout with buttons
 			middle_layout = QVBoxLayout()
 			middle_layout.addStretch(1)
 
-			# Add "Owned" label and spinbox
 			owned_layout = QVBoxLayout()
 			owned_label = BodyLabel("Owned")
 			self.owned_spinbox = SpinBox()
@@ -91,14 +87,13 @@ class HomeInterface(QWidget):
 			middle_layout.addStretch(1)
 			mainLayout.addLayout(middle_layout)
 
-			# Right layout with search bar and list of items
 			right_layout = QVBoxLayout()
 			self.search_bar = LineEdit()
 			self.search_bar.setPlaceholderText("Search...")
 			self.search_bar.textChanged.connect(self.filter_list)
 
 			self.list_widget = ListWidget()
-			self.list_widget.addItems(sorted(itemsID))
+			self.list_widget.addItems([itemsID[item]['name'] for item in sorted(itemsID)])
 
 			right_layout.addWidget(self.search_bar)
 			right_layout.addWidget(self.list_widget)
@@ -134,7 +129,7 @@ class HomeInterface(QWidget):
 
 		selected_item = self.list_widget.currentItem()
 		if selected_item:
-			item_id = itemsID.get(selected_item.text())['id']
+			item_id = itemsID.get(selected_item.text().lower().replace(' ', ''))['id']
 			INVENTORY['items'][item_id] = self.owned_spinbox.value()
 			savingScraped(START_DATE=INVENTORY['date'])
 		
@@ -211,7 +206,7 @@ class LControlPanel(QFrame):
 		self.scanEchoes = CheckBox('Echoes', self)
 		self.scanDevItems = CheckBox('Development Items', self)
 		self.scanResources = CheckBox('Resources', self)
-		self.scanAchievements = CheckBox('Achievements', self)  # New checkbox
+		self.scanAchievements = CheckBox('Achievements', self)
 
 		self.closeLabel = BodyLabel("Press 'ENTER' to cancel the scan.")
 
@@ -304,7 +299,7 @@ class LControlPanel(QFrame):
 	def runScraper(self):
 		"""Run the scraper and emit notifications if needed."""
 
-		notification = start()
+		notification = startScraper()
 		if notification:
 			logger.debug(f"Notification: {notification}")
 			self.signalNotifier.emit(notification[0], notification[1], notification[2])

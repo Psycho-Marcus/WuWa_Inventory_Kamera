@@ -9,10 +9,6 @@ data/
 export/
 config/
 
-# Ignore Tesseract-OCR files
-Tesseract-OCR/*
-!Tesseract-OCR/.gitkeep
-
 # Ignore assets
 assets/*
 !assets/icon.ico

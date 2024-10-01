@@ -1,6 +1,5 @@
 import ctypes
 import ctypes.wintypes as wintypes
-import time
 import logging
 
 logger = logging.getLogger('KeyPressChecker')

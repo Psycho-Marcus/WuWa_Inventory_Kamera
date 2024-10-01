@@ -3,7 +3,7 @@ from scraping.scraperManager import managerStart
 
 from pyuac import isUserAdmin
 
-def start():
+def startScraper():
     if isUserAdmin():
         scanners = {
             'characters': cfg.get(cfg.scanCharacters),
@@ -14,6 +14,8 @@ def start():
             'achievements': cfg.get(cfg.scanAchievements),
         }
         enabled = [key for key, value in scanners.items() if value]
+        enabled = ['achievements'] if 'achievements' in enabled else enabled
+
         if enabled:
             return managerStart(enabled)
         else:

@@ -1,38 +1,19 @@
 import cv2
 import string
-import pytesseract
 import numpy as np
+from difflib import get_close_matches
 from collections import defaultdict
 
-from scraping.utils import echoesID
+from scraping.utils import echoesID, echoStats
 from scraping.utils import (
     scaleWidth, scaleHeight, screenshot,
-    convertToBlackWhite, mouseScroll, leftClick,
-    presskey
+    imageToString, convertToBlackWhite, mouseScroll,
+    leftClick, presskey
 )
 from properties.config import cfg
 
 # Constants
 ROWS, COLS = 4, 6
-STATS_NAME = {
-    'hp': 'hp',
-    'atk': 'atk',
-    'def': 'def',
-    'aerodmg': 'aero',
-    'glaciodmg': 'glacio',
-    'fusiondmg': 'fusion',
-    'electrodmg': 'electro',
-    'havocdmg': 'havoc',
-    'spectrodmg': 'spectro',
-    'energyregen': 'er',
-    'critrate': 'cr',
-    'critdmg': 'cd',
-    'healingbonus': 'healing',
-    'basicattackdmgbonus': 'basic_attack',
-    'heavyattackdmgbonus': 'heavy_attack',
-    'resonanceskilldmgbonus': 'skill_dmg',
-    'resonanceliberationdmgbonus': 'liberation_dmg',
-}
 
 class Coordinates:
     def __init__(self, x: int, y: int, w: int, h: int):
@@ -60,27 +41,37 @@ def scaleCoordinates(coords: dict[str, tuple[int, int, int, int]], width: int, h
 
 def getROI(width: int, height: int) -> ROI_Info:
     unscaled_coords = {
-        'page': (205, 55, 125, 30),
-        'name': (1305, 116, 545, 55),
-        'level': (1770, 250, 65, 30),
+        'page': (200, 50, 130, 40),
         'start': (205, 122, 151, 181),
-        'mainStatName': (1380, 430, 360, 35),
-        'mainStatValue': (1740, 430, 100, 35),
-        'subStatName': (1380, 510, 360, 280),
-        'subStatValue': (1740, 510, 100, 280),
-
+        'echoCard': (1296, 114, 558, 170),
         'fullStatsName': (1380, 430, 360, 380),
         'fullStatsValue': (1740, 430, 100, 380),
     }
     return ROI_Info(width, height, scaleCoordinates(unscaled_coords, width, height))
 
+def matchStats(text):
+    stats = set(echoStats)
+    results = []
+    i = 0
+    while i < len(text):
+        if i < len(text) - 1:
+            combinedWord = text[i] + text[i + 1]
+            if combinedWord in stats:
+                results.append(combinedWord)
+                i += 2
+                continue
+        if text[i] in stats:
+            results.append(text[i])
+        i += 1
+    return results
+
 def setupRarityDetection():
     rarityColors = {
-        5: np.array([255, 230, 90]),
-        4: np.array([202, 109, 255]),
-        3: np.array([89, 180, 211]),
-        2: np.array([92, 195, 94]),
-        1: np.array([239, 236, 225])
+        5: np.array([90, 230, 255]),
+        4: np.array([255, 109, 202]),
+        3: np.array([211, 180, 89]),
+        2: np.array([94, 195, 92]),
+        1: np.array([225, 236, 239])
     }
 
     tolerance = 10
@@ -99,13 +90,16 @@ def getRarity(image: np.ndarray):
 
 def getEchoPages(roiInfo: ROI_Info) -> int:
     coords = roiInfo.coords['page']
-    img = convertToBlackWhite(screenshot(0, 0, roiInfo.width, roiInfo.height)[coords.y:coords.y + coords.h, coords.x:coords.x + coords.w])
-    echoCount = pytesseract.image_to_string(img, config=f'--psm 7 -c tessedit_char_whitelist={string.digits}/').split('/')[0]
+    image = screenshot(width=roiInfo.width, height=roiInfo.height)[coords.y:coords.y + coords.h, coords.x:coords.x + coords.w]
+    echoCount = imageToString(image, allowedChars=string.digits + '/').split('/')[0]
     
     try: return int(echoCount), int(np.ceil(int(echoCount) / 24))
     except ValueError: return 24, 1
 
 def processEcho(name: str, level: int, tuneLv: int, rarity: int, stats: dict) -> dict[str, dict[int, int, dict]]:
+    result = get_close_matches(name, echoesID, 1, 0.9)
+    if result: name = result[0]
+    
     echoID = str(echoesID.get(name, name))
     return {
         echoID: {
@@ -116,7 +110,7 @@ def processEcho(name: str, level: int, tuneLv: int, rarity: int, stats: dict) ->
         }
     }
 
-def processStats(image: np.ndarray, roiInfo: ROI_Info) -> dict[str:int]:
+def processStats(image: np.ndarray, roiInfo: ROI_Info, _cache: dict) -> dict[str:int]:
     stats = defaultdict(dict)
     coords = roiInfo.coords
     tuneLv = 0
@@ -125,27 +119,34 @@ def processStats(image: np.ndarray, roiInfo: ROI_Info) -> dict[str:int]:
         coords['fullStatsName'].y:coords['fullStatsName'].y + coords['fullStatsName'].h,
         coords['fullStatsName'].x:coords['fullStatsName'].x + coords['fullStatsName'].w
     ]
+    nameImage = convertToBlackWhite(nameImage)
+    nameHash = hash(nameImage.tobytes())
+
     valueImage = image[
         coords['fullStatsValue'].y:coords['fullStatsValue'].y + coords['fullStatsValue'].h,
         coords['fullStatsValue'].x:coords['fullStatsValue'].x + coords['fullStatsValue'].w
     ]
-    
-    names = pytesseract.image_to_string(nameImage, config=f'--psm 4').split('Echo Skill')[0].split('Skill')[0].lower().replace('\n\n', '\n').strip()
-    values = pytesseract.image_to_string(valueImage, config=f'--psm 4 tessedit_char_whitelist={string.digits}.,%').strip()
+    valueImage = convertToBlackWhite(valueImage)
+    valueHash = hash(valueImage.tobytes())
 
-    for stat in ['Resonance Liberation\nDMG Bonus', 'Resonance Skill DMG\nBonus']:
-        names = names.replace(stat.lower(), stat.lower().replace('\n', ' '))
+    if nameHash in _cache:
+        names = _cache[nameHash]
+    else:
+        names = imageToString(nameImage, allowedChars=string.ascii_letters).lower().split('\n')
+        names = matchStats(names)
+        _cache[nameHash] = names
 
-    values = values.replace(')', '').replace(',', '.').replace('\n\n', '\n')
+    if valueHash in _cache:
+        values = _cache[valueHash]
+    else:
+        values = imageToString(valueImage, allowedChars=string.digits + '.%').split()
+        _cache[valueHash] = values
+    tuneLv = max(0, len(values) - 2)
 
-    names_list = names.split('\n')
-    values_list = values.split('\n')
-    values_list = [x for x in values_list if len(x) > 1 and x.translate(str.maketrans('', '', string.ascii_letters))]
-    tuneLv = len(values_list)
-    
-    for index, (statName, statValue) in enumerate(zip(names_list, values_list)):
-        statName = STATS_NAME.get(statName.replace(' ', '').replace('.', ''), statName)
-        
+
+    for index, (statName, statValue) in enumerate(zip(names, values)):
+        statName = echoStats.get(statName, statName)
+
         if index < 2: stat = 'main'
         else: stat = 'sub'
         
@@ -156,33 +157,47 @@ def processStats(image: np.ndarray, roiInfo: ROI_Info) -> dict[str:int]:
 
     return tuneLv, dict(stats)
 
-def processGridEcho(image: np.ndarray, roiInfo: ROI_Info) -> tuple[dict[str, int], list[dict[str, dict[str, int]]]]:
-    echoes = []
+def processGridEcho(echoes: list, image: np.ndarray, roiInfo: ROI_Info, _cache: dict) -> tuple[dict[str, int], list[dict[str, dict[str, int]]]]:
     coords = roiInfo.coords
 
-    imageName = image[coords['name'].y:coords['name'].y + coords['name'].h, coords['name'].x:coords['name'].x + coords['name'].w]
-    name = pytesseract.image_to_string(imageName).strip()
+    echoCard = image[coords['echoCard'].y:coords['echoCard'].y + coords['echoCard'].h, coords['echoCard'].x:coords['echoCard'].x + coords['echoCard'].w]
+    echoHash = hash(echoCard.tobytes())
+    if echoHash in _cache:
+        info = _cache[echoHash]
+    else:
+        info = [imageToString(echoCard, '', bannedChars=' +').lower().split('\n')]
+        _cache[echoHash] = info
+    name = info[0][0]
     
     if name in echoesID:
-        rarity = getRarity(imageName)
+        if echoHash in _cache:
+            try:
+                rarity = info[1][0]
+            except:
+                rarity = getRarity(echoCard)
+                _cache[echoHash].append(rarity)
+        else:
+            rarity = getRarity(echoCard)
+            _cache[echoHash].append(rarity)
+        
         if rarity >= cfg.get(cfg.echoMinRarity):
-            levelText = pytesseract.image_to_string(image[coords['level'].y:coords['level'].y + coords['level'].h, coords['level'].x:coords['level'].x + coords['level'].w], config=f'--psm 7 -c tessedit_char_whitelist={string.digits}')
+            levelText = info[0][2]
             
             try: level = int(levelText)
             except ValueError: level = 0
             level = min(25, level)
 
             if level >= cfg.get(cfg.echoMinLevel):
-                tuneLv, stats = processStats(image, roiInfo)
+                tuneLv, stats = processStats(image, roiInfo, _cache)
                 echoes.append(processEcho(name, level, tuneLv, rarity, stats))
-                return echoes, True
-        else:
-            return echoes, False
+                return True
+        return False
 
-    return echoes, True
+    return True
 
 def echoScraper(x: float, y: float, width: int, height: int) -> tuple[dict[str, int], list[dict[str, dict[str, int]]]]:
-    echoes = []
+    echoes = list()
+    _cache = dict()
     roiInfo = getROI(width, height)
     scrollValue = -31.25
 
@@ -196,22 +211,23 @@ def echoScraper(x: float, y: float, width: int, height: int) -> tuple[dict[str, 
         for row in range(ROWS):
             for col in range(COLS):
                 if page == pages - 1 and (page * (ROWS * COLS) + row * COLS + col) > (page * 24) + (echoCount % 24):
-                    continueScraping = False
-                    break
+                    del _cache
+                    return echoes
 
                 startCoords = roiInfo.coords['start']
                 center_x = startCoords.x + (col * (startCoords.w + scaleWidth(16, width))) + startCoords.w // 2
                 center_y = startCoords.y + (row * (startCoords.h + scaleHeight(24, height))) + startCoords.h // 2
                 
                 leftClick(center_x, center_y)
-                image = screenshot(0, 0, width, height)
+                image = screenshot(width=width, height=height)
                 
-                echo, continueScraping = processGridEcho(image, roiInfo)
-                echoes.extend(echo)
-            if not continueScraping:
-                return echoes
+                continueScraping = processGridEcho(echoes, image, roiInfo, _cache)
+                if not continueScraping:
+                    del _cache
+                    return echoes
 
         if page < pages - 1 and continueScraping:
             mouseScroll(scrollValue, 1.2)
 
+    del _cache
     return echoes

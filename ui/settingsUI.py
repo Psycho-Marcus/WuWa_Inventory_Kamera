@@ -70,14 +70,6 @@ class SettingInterface(ScrollArea):
 			self.personalizationGroup
 		)
 
-		self.tesseractFolderCard = PushSettingCard(
-			self.tr('Choose folder'),
-			FIF.DEVELOPER_TOOLS,
-			self.tr("Tesseract-OCR"),
-			cfg.get(cfg.tesseractFolder),
-			self.personalizationGroup
-		)
-
 		# In-Game settings
 		self.inGameGroup = SettingCardGroup(self.tr("In-Game settings"), self.scrollWidget)
 		self.roverName = FieldSettingCard(
@@ -155,7 +147,6 @@ class SettingInterface(ScrollArea):
 		# Add widgets to their respective groups
 		self.personalizationGroup.addSettingCard(self.themeCard)
 		self.personalizationGroup.addSettingCard(self.exportFolderCard)
-		self.personalizationGroup.addSettingCard(self.tesseractFolderCard)
 		self.inGameGroup.addSettingCard(self.roverName)
 		self.inGameGroup.addSettingCard(self.languageGame)
 		self.inGameGroup.addSettingCard(self.inventoryKey)
@@ -187,14 +178,6 @@ class SettingInterface(ScrollArea):
 		if folder and cfg.get(cfg.exportFolder) != folder:
 			cfg.set(cfg.exportFolder, folder)
 			self.exportFolderCard.setContent(folder)
-	
-	def __onTesseractFolderCardClicked(self):
-		"""Handle the event when the tesseract folder card is clicked."""
-		folder = QFileDialog.getExistingDirectory(
-			self, self.tr("Choose tesseract folder"), "./")
-		if folder and cfg.get(cfg.exportFolder) != folder:
-			cfg.set(cfg.exportFolder, folder)
-			self.exportFolderCard.setContent(folder)
 
 	def __onThemeChanged(self, theme: Theme):
 		"""Handle theme change events."""
@@ -205,5 +188,4 @@ class SettingInterface(ScrollArea):
 		cfg.appRestartSig.connect(self.__showRestartTooltip)
 		cfg.themeChanged.connect(self.__onThemeChanged)
 		self.exportFolderCard.clicked.connect(self.__onExportFolderCardClicked)
-		self.tesseractFolderCard.clicked.connect(self.__onTesseractFolderCardClicked)
 		self.feedbackCard.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(FEEDBACK_URL)))

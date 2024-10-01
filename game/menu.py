@@ -1,12 +1,11 @@
 import time
 import logging
-import pytesseract
 
-import properties.config
 from game.screenSize import WindowManager
 from game.foreground import WindowFocusManager
 from scraping.utils import (
-    scaleWidth, scaleHeight, screenshot
+    scaleWidth, scaleHeight, screenshot,
+    imageToString
 )
 
 logger = logging.getLogger('MainMenuController')
@@ -24,15 +23,15 @@ class MainMenuController:
         try:
             image = screenshot(
                 scaleWidth(140, WindowManager.getWidth()),
-                scaleHeight(45, WindowManager.getHeight()),
-                scaleWidth(140, WindowManager.getWidth()),
-                scaleHeight(30, WindowManager.getHeight())
+                scaleHeight(40, WindowManager.getHeight()),
+                scaleWidth(150, WindowManager.getWidth()),
+                scaleHeight(40, WindowManager.getHeight())
             )
 
-            result = pytesseract.image_to_string(image).strip().lower()
+            result = imageToString(image, '').lower()
             logger.debug(f"Detected text from screenshot: '{result}'")
             
-            return result in ['terminal', 'terminat']
+            return result == 'terminal' # MULTILANG
         except Exception as e:
             logger.error(f"Failed to capture or process screenshot: {e}")
             return False

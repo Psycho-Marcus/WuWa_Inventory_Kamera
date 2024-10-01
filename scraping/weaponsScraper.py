@@ -1,12 +1,12 @@
 import string
-import pytesseract
 import numpy as np
+from difflib import get_close_matches
 
 from scraping.utils import weaponsID, itemsID
 from scraping.utils import (
     scaleWidth, scaleHeight, screenshot,
-    convertToBlackWhite, mouseScroll, leftClick,
-    presskey
+    convertToBlackWhite, imageToString, mouseScroll,
+    leftClick, presskey
 )
 from properties.config import cfg
 
@@ -40,28 +40,28 @@ def scaleCoordinates(coords: dict[str, tuple[int, int, int, int]], width: int, h
 
 def getROI(width: int, height: int) -> ROI_Info:
     unscaled_coords = {
-        'page': (230, 55, 125, 30),
+        'page': (230, 50, 125, 40),
         'name': (1305, 116, 545, 55),
         'value': (1655, 320, 190, 40),
-        'level': (1660, 240, 175, 35),
-        'rank': (1305, 540, 105, 30),
+        'level': (1660, 235, 180, 45),
+        'rank': (1300, 530, 115, 50),
         'start': (205, 122, 151, 181),
     }
     return ROI_Info(width, height, scaleCoordinates(unscaled_coords, width, height))
 
 def getWeaponPages(roiInfo: ROI_Info) -> int:
     coords = roiInfo.coords['page']
-    img = convertToBlackWhite(screenshot(0, 0, roiInfo.width, roiInfo.height)[coords.y:coords.y + coords.h, coords.x:coords.x + coords.w])
-    weaponCount = pytesseract.image_to_string(img, config=f'--psm 7 -c tessedit_char_whitelist={string.digits}/').split('/')[0]
+    img = convertToBlackWhite(screenshot(width=roiInfo.width, height=roiInfo.height)[coords.y:coords.y + coords.h, coords.x:coords.x + coords.w])
+    weaponCount = imageToString(img, '', allowedChars=string.digits + '/').split('/')[0]
     try:
         return int(weaponCount), int(np.ceil(int(weaponCount) / 24))
     except ValueError:
         return 24, 1
 
-def processItem(name: str, value_text: str) -> tuple[str, int]:
+def processItem(name: str, valueText: str) -> tuple[str, int]:
     itemID = itemsID[name]['id']
     try:
-        value = int(value_text.split(' ', 1)[1])
+        value = int(valueText)
     except ValueError:
         value = 1
     return itemID, value
@@ -77,33 +77,71 @@ def processWeapon(name: str, levelText: str, rankText: str) -> dict[str, dict[st
         }
     }
 
-def processGridItem(image: np.ndarray, roiInfo: ROI_Info) -> tuple[dict[str, int], list[dict[str, dict[str, int]]]]:
-    inventory = {}
-    weapons = []
+def processGridItem(inventory: dict, weapons: list, image: np.ndarray, roiInfo: ROI_Info, _cache: dict) -> tuple[dict[str, int], list[dict[str, dict[str, int]]]]:
     coords = roiInfo.coords
 
-    name = pytesseract.image_to_string(image[coords['name'].y:coords['name'].y + coords['name'].h, coords['name'].x:coords['name'].x + coords['name'].w]).strip()
+    nameImage = image[coords['name'].y:coords['name'].y + coords['name'].h, coords['name'].x:coords['name'].x + coords['name'].w]
+    nameImage = convertToBlackWhite(nameImage)
+    nameHash = hash(nameImage.tobytes())
+
+    if nameHash in _cache:
+        name = _cache[nameHash]
+    else:
+        name = imageToString(nameImage, '', bannedChars=' ').lower()
+        result = get_close_matches(name, weaponsID, 1, 0.9)
+        if not result:
+            result = get_close_matches(name, itemsID, 1, 0.9)
+            if not result:
+                result = [name]
+        
+        _cache[nameHash] = result[0]
+        name = result[0]
     
     if name in itemsID:
-        value_text = pytesseract.image_to_string(image[coords['value'].y:coords['value'].y + coords['value'].h, coords['value'].x:coords['value'].x + coords['value'].w]).strip()
-        itemID, value = processItem(name, value_text)
+        valueImage = image[coords['value'].y:coords['value'].y + coords['value'].h, coords['value'].x:coords['value'].x + coords['value'].w]
+        valueImage = convertToBlackWhite(valueImage)
+        valueHash = hash(valueImage.tobytes())
+
+        if valueHash in _cache:
+            valueText = _cache[valueHash]
+        else:
+            valueText = imageToString(valueImage, '', allowedChars=string.digits)
+            _cache[valueHash] = valueText
+        
+        itemID, value = processItem(name, valueText)
         inventory[itemID] = value
+        return True
     elif name in weaponsID:
         if weaponsID[name]['rarity'] >= cfg.get(cfg.weaponsMinRarity):
-            levelText = pytesseract.image_to_string(image[coords['level'].y:coords['level'].y + coords['level'].h, coords['level'].x:coords['level'].x + coords['level'].w], config=f'--psm 7 -c tessedit_char_whitelist={string.digits}/')
+            levelImage = image[coords['level'].y:coords['level'].y + coords['level'].h, coords['level'].x:coords['level'].x + coords['level'].w]
+            levelImage = convertToBlackWhite(levelImage)
+            levelHash = hash(levelImage.tobytes())
+
+            if levelHash in _cache:
+                levelText = _cache[levelHash]
+            else:
+                levelText = imageToString(levelImage, '', allowedChars=string.digits + '/')
+                _cache[levelHash] = levelText
             
             if int(levelText.split('/')[0]) >= cfg.get(cfg.weaponsMinLevel):
-                rankText = pytesseract.image_to_string(image[coords['rank'].y:coords['rank'].y + coords['rank'].h, coords['rank'].x:coords['rank'].x + coords['rank'].w], config=f'--psm 7 -c tessedit_char_whitelist={string.digits}')
-                weapons.append(processWeapon(name, levelText, rankText))
-                return inventory, weapons, True
-        else:
-            return inventory, weapons, False
+                rankImage = image[coords['rank'].y:coords['rank'].y + coords['rank'].h, coords['rank'].x:coords['rank'].x + coords['rank'].w]
+                rankImage = convertToBlackWhite(rankImage)
+                rankHash = hash(rankImage.tobytes())
 
-    return inventory, weapons, True
+                if rankHash in _cache:
+                    rankText = _cache[rankHash]
+                else:
+                    rankText = imageToString(rankImage, '', allowedChars=string.digits)
+                    _cache[rankHash] = rankText
+                weapons.append(processWeapon(name, levelText, rankText))
+                return True
+        return False
+    return True
 
 def weaponScraper(x: float, y: float, width: int, height: int) -> tuple[dict[str, int], list[dict[str, dict[str, int]]]]:
-    inventory = {}
-    weapons = []
+    inventory = dict()
+    weapons = list()
+    _cache = dict()
     roiInfo = getROI(width, height)
 
     presskey(cfg.get(cfg.inventoryKeybind), 2, False)
@@ -116,23 +154,23 @@ def weaponScraper(x: float, y: float, width: int, height: int) -> tuple[dict[str
         for row in range(ROWS):
             for col in range(COLS):
                 if page == pages - 1 and (page * (ROWS * COLS) + row * COLS + col) > (page * 24) + (weaponCount % 24):
-                    continueScraping = False
-                    break
+                    del _cache
+                    return inventory, weapons
 
                 startCoords = roiInfo.coords['start']
                 center_x = startCoords.x + (col * (startCoords.w + scaleWidth(16, width))) + startCoords.w // 2
                 center_y = startCoords.y + (row * (startCoords.h + scaleHeight(24, height))) + startCoords.h // 2
                 
                 leftClick(center_x, center_y)
-                image = screenshot(0, 0, width, height)
+                image = screenshot(width=width, height=height)
                 
-                itemInventory, itemWeapons, continueScraping = processGridItem(image, roiInfo)
-                inventory.update(itemInventory)
-                weapons.extend(itemWeapons)
-            if not continueScraping:
-                return inventory, weapons
+                continueScraping = processGridItem(inventory, weapons, image, roiInfo, _cache)
+                if not continueScraping:
+                    del _cache
+                    return inventory, weapons
 
         if page < pages - 1 and continueScraping:
             mouseScroll(-31.25, 1.2)
 
+    del _cache
     return inventory, weapons

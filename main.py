@@ -1,5 +1,6 @@
 import os
 import logging
+import multiprocessing
 from logging.handlers import TimedRotatingFileHandler
 from app import start
 
@@ -61,4 +62,5 @@ def configure_logging():
 
 
 if __name__ == '__main__':
+	multiprocessing.freeze_support()
 	main()
