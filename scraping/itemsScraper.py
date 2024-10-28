@@ -7,10 +7,10 @@ from difflib import get_close_matches
 
 from scraping.utils import itemsID
 from scraping.utils import (
-    scaleWidth, scaleHeight, screenshot,
-    mouseScroll, leftClick, presskey,
-    imageToString, convertToBlackWhite
+    screenshot, mouseScroll, leftClick,
+    presskey, imageToString, convertToBlackWhite
 )
+from game.screenInfo import ScreenInfo
 from properties.config import cfg, basePATH
 
 # Constants
@@ -29,24 +29,24 @@ class ROI_Info:
         self.height = height
         self.coords = coords
 
-def scaleCoordinates(coords: dict[str, tuple[int, int, int, int]], width: int, height: int) -> dict[str, Coordinates]:
+def scaleCoordinates(coords: dict[str, tuple[int, int, int, int]], screenInfo: ScreenInfo) -> dict[str, Coordinates]:
     return {
         key: Coordinates(
-            scaleWidth(x, width),
-            scaleHeight(y, height),
-            scaleWidth(w, width),
-            scaleHeight(h, height)
+            screenInfo.scaleWidth(x),
+            screenInfo.scaleHeight(y),
+            screenInfo.scaleWidth(w),
+            screenInfo.scaleHeight(h)
         )
         for key, (x, y, w, h) in coords.items()
     }
 
-def getROI(width: int, height: int) -> ROI_Info:
+def getROI(screenInfo: ScreenInfo) -> ROI_Info:
     unscaled_coords = {
-        'info': (1296, 114, 558, 278),
-        'description': (1296, 114, 558, 820),
-        'start': (205, 122, 151, 181),
+        'info': ((1296, 1136), (114, 154), (558, 485), (278, 240)),
+        'description': ((1296, 1136), (114, 154), (558, 485), (820, 715)),
+        'start': ((205, 180), (122, 104), (151, 130), (181, 162)),
     }
-    return ROI_Info(width, height, scaleCoordinates(unscaled_coords, width, height))
+    return ROI_Info(screenInfo.width, screenInfo.height, scaleCoordinates(unscaled_coords, screenInfo))
 
 
 def processItem(path: str, image: np.ndarray, roiInfo: ROI_Info, _cache: dict) -> tuple[dict[str, int], list[dict]]:
@@ -91,14 +91,14 @@ def processItem(path: str, image: np.ndarray, roiInfo: ROI_Info, _cache: dict) -
 
     return inventory, failed, name
 
-def itemsScraper(START_DATE: str, x: int, y: int, WIDTH: int, HEIGHT: int):
+def itemsScraper(START_DATE: str, x: int, y: int, screenInfo: ScreenInfo):
     path = os.path.join(basePATH, 'logs', 'fail', START_DATE)
     
     inventory = dict()
     failed = list()
     encounters = dict()
     _cache = dict()
-    roiInfo = getROI(WIDTH, HEIGHT)
+    roiInfo = getROI(screenInfo)
 
     presskey(cfg.get(cfg.inventoryKeybind), 2, False)
     leftClick(x, y)
@@ -110,11 +110,11 @@ def itemsScraper(START_DATE: str, x: int, y: int, WIDTH: int, HEIGHT: int):
         for row in range(ROWS):
             for col in range(COLS):
                 startCoords = roiInfo.coords['start']
-                center_x = startCoords.x + (col * (startCoords.w + scaleWidth(16, WIDTH))) + startCoords.w // 2
-                center_y = startCoords.y + (row * (startCoords.h + scaleHeight(24, HEIGHT))) + startCoords.h // 2
+                center_x = startCoords.x + (col * (startCoords.w + screenInfo.scaleWidth(16))) + startCoords.w // 2
+                center_y = startCoords.y + (row * (startCoords.h + screenInfo.scaleHeight(24))) + startCoords.h // 2
                 
                 leftClick(center_x, center_y)
-                image = screenshot(width=WIDTH, height=HEIGHT)
+                image = screenshot(width=screenInfo.width, height=screenInfo.height)
                 
                 item_inventory, item_failed, name = processItem(path, image, roiInfo, _cache)
                 inventory.update(item_inventory)
@@ -132,18 +132,18 @@ def itemsScraper(START_DATE: str, x: int, y: int, WIDTH: int, HEIGHT: int):
                 break
         
         if not isDouble:
-            mouseScroll(-31.25, 1.2)
+            mouseScroll(screenInfo.scaleHeight((-31.25, -31.75)), 1.2)
 
     # Process last page
     isDouble = False
     for row in range(ROWS - 1, -1, -1):
         for col in range(COLS - 1, -1, -1):
             startCoords = roiInfo.coords['start']
-            center_x = startCoords.x + (col * (startCoords.w + scaleWidth(16, WIDTH))) + startCoords.w // 2
-            center_y = startCoords.y + (row * (startCoords.h + scaleHeight(24, HEIGHT))) + startCoords.h // 2
+            center_x = startCoords.x + (col * (startCoords.w + screenInfo.scaleWidth(16))) + startCoords.w // 2
+            center_y = startCoords.y + (row * (startCoords.h + screenInfo.scaleHeight(24))) + startCoords.h // 2
             
             leftClick(center_x, center_y)
-            image = screenshot(width=WIDTH, height=HEIGHT)
+            image = screenshot(width=screenInfo.width, height=screenInfo.height)
             
             item_inventory, item_failed, name = processItem(path, image, roiInfo, _cache)
             

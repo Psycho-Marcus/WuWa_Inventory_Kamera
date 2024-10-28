@@ -1,5 +1,6 @@
-import sys
 import os
+import sys
+import json
 import string
 import ctypes
 
@@ -22,7 +23,8 @@ DPI_SCALING = user32.GetDpiForWindow(user32.GetForegroundWindow()) / 96.0
 INVENTORY = {'date': str(), 'items': dict()}
 FAILED: list[dict] = list()
 maxLength = 12
-
+try: LANGUAGES = json.load(open(os.path.join(os.path.dirname(basePATH), 'data', 'languages.json'), 'r', encoding='utf-8'))
+except: LANGUAGES = {'English': 'en'}
 
 def alphabethList() -> list[str]:
 	"""Generate a list of uppercase letters, digits, and punctuation."""
@@ -100,7 +102,7 @@ class Config(QConfig):
 	# Configuration items
 	exportFolder = ConfigItem("Folders", "Export", "export", FolderValidator())
 	checkUpdateAtStartUp = ConfigItem("Update", "CheckUpdateAtStartUp", True, BoolValidator())
-	gameLanguages = OptionsConfigItem('InGame', 'Language', 'English', OptionsValidator(['English']))
+	gameLanguage = OptionsConfigItem('InGame', 'Language', 'English', OptionsValidator(list(LANGUAGES)))
 	inventoryKeybind = OptionsConfigItem('InGame', 'InventoryKeybind', 'B', OptionsValidator(alphabethList()))
 	resonatorKeybind = OptionsConfigItem('InGame', 'ResonatorKeybind', 'C', OptionsValidator(alphabethList()))
 	roverName = ConfigItem('InGame', 'RoverName', 'Rover', TextValidator(max_length=maxLength))

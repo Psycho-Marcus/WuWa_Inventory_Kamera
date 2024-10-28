@@ -139,7 +139,7 @@ class InventoryInterface(ScrollArea):
 
 		if file_path:
 			self.inventoryFileCard.setContent(file_path)
-			with open(file_path, 'r', encoding='UTF-8') as file:
+			with open(file_path, 'r', encoding='utf-8') as file:
 				try:
 					data = json.load(file)
 					self.__populateGrid(data)
@@ -160,7 +160,7 @@ class InventoryInterface(ScrollArea):
 					if item_id is not None:
 						inventory_data[item_id] = quantity
 			
-			with open(file_path, 'w', encoding='UTF-8') as file:
+			with open(file_path, 'w', encoding='utf-8') as file:
 				json.dump(inventory_data, file, ensure_ascii=False, indent=4)
 
 	def __populateGrid(self, inventory_file):

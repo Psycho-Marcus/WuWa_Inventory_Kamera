@@ -1,12 +1,12 @@
 import pyperclip
 import numpy as np
 
-from scraping.utils import achievementsID
+from scraping.utils import achievementsID, definedText
 from scraping.utils import (
-    scaleWidth, scaleHeight, screenshot,
-    imageToString, convertToBlackWhite, leftClick,
-    presskey, hotkey
+    screenshot, imageToString, convertToBlackWhite,
+    leftClick, presskey, hotkey
 )
+from game.screenInfo import ScreenInfo
 
 class Coordinates:
     def __init__(self, x: int, y: int, w: int, h: int):
@@ -21,27 +21,26 @@ class ROI_Info:
         self.height = height
         self.coords = coords
 
-def scaleCoordinates(coords: dict[str, tuple[int, int, int, int]], width: int, height: int) -> dict[str, Coordinates]:
+def scaleCoordinates(coords: dict[str, tuple[int, int, int, int]], screenInfo: ScreenInfo) -> dict[str, Coordinates]:
     return {
         key: Coordinates(
-            scaleWidth(x, width),
-            scaleHeight(y, height),
-            scaleWidth(w, width),
-            scaleHeight(h, height)
+            screenInfo.scaleWidth(x),
+            screenInfo.scaleHeight(y),
+            screenInfo.scaleWidth(w),
+            screenInfo.scaleHeight(h)
         )
         for key, (x, y, w, h) in coords.items()
     }
 
-def getROI(width: int, height: int) -> ROI_Info:
+def getROI(screenInfo: ScreenInfo) -> ROI_Info:
     unscaled_coords = {
-        'status': (1579, 230, 256, 65),
-        'notFound': (855, 550, 280, 35),
-        'searchBar': (388, 149, 1, 1),
-        'searchButton': (629, 149, 1, 1),
-        'achievementsButton': (1674, 790, 1, 1),
+        'status': (1579, (230, 197), 256, 65),
+        'searchBar': (388, (149, 129), 1, 1),
+        'searchButton': (629, (149, 129), 1, 1),
+        'achievementsButton': (1674, (790, 690), 1, 1),
         'achievementsTab': (835, 570, 1, 1),
     }
-    return ROI_Info(width, height, scaleCoordinates(unscaled_coords, width, height))
+    return ROI_Info(screenInfo.width, screenInfo.height, scaleCoordinates(unscaled_coords, screenInfo))
 
 def processAchievement(image: np.ndarray, roiInfo: ROI_Info, achievementName: str, _cache: dict) -> str | None:
     coords = roiInfo.coords
@@ -53,15 +52,15 @@ def processAchievement(image: np.ndarray, roiInfo: ROI_Info, achievementName: st
         statusText = imageToString(statusImage).lower()
         _cache[statusHash] = statusText
 
-    if statusText == 'claim' or '/' in statusText: # MULTILANG
+    if statusText == definedText['PrefabTextItem_128820487_Text'] or '/' in statusText: # MULTILANG
         return achievementsID[achievementName]
     
     return None
 
-def achievementScraper(WIDTH: int, HEIGHT: int) -> list[str]:
+def achievementScraper(screenInfo: ScreenInfo) -> list[str]:
     achievements = []
     _cache = dict()
-    roiInfo = getROI(WIDTH, HEIGHT)
+    roiInfo = getROI(screenInfo)
 
     presskey('esc', 1)
     leftClick(roiInfo.coords['achievementsButton'].x, roiInfo.coords['achievementsButton'].y, 1.2)
@@ -73,7 +72,7 @@ def achievementScraper(WIDTH: int, HEIGHT: int) -> list[str]:
         hotkey('ctrl', 'v', waitTime=.3)
         leftClick(roiInfo.coords['searchButton'].x, roiInfo.coords['searchButton'].y, .6)
 
-        image = screenshot(width=WIDTH, height=HEIGHT)
+        image = screenshot(width=screenInfo.width, height=screenInfo.height)
         achievement = processAchievement(image, roiInfo, achievementName, _cache)
         if achievement:
             achievements.append(achievement)

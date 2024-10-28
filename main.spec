@@ -3,7 +3,7 @@ from PyInstaller.utils.win32 import versioninfo as vi
 from pathlib import Path
 import importlib.util
 
-version = (1, 5, 4, 0)
+version = (1, 6, 0, 0)
 
 version_file = vi.VSVersionInfo(
     ffi=vi.FixedFileInfo(
@@ -72,7 +72,7 @@ a = Analysis(
         ('assets', 'assets'),
         *add_data
     ],
-    hiddenimports=[],
+    hiddenimports=['babel.dates', 'babel.numbers'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

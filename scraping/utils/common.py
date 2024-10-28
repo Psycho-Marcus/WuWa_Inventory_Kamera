@@ -12,7 +12,10 @@ from properties.config import (
 def loadFile(filePATH: str, default = {}) -> dict:
     try:
         with open(filePATH, 'r') as file:
-            return json.load(file)
+            data = json.load(file)
+            if isinstance(default, list):
+                data = list(data)
+            return data
     except (FileNotFoundError, json.JSONDecodeError):
         return default
 
@@ -22,7 +25,8 @@ weaponsID: dict = loadFile('./data/weapons.json')
 echoesID: dict = loadFile('./data/echoes.json')
 achievementsID: dict = loadFile('./data/achievements.json')
 echoStats: dict = loadFile('./data/echoStats.json')
-definedText: list = loadFile('./data/definedText.json', [])
+definedText: dict = loadFile('./data/definedText.json')
+sonataName: list = loadFile('./data/sonataName.json', [])
 
 def savingScraped(scannedData: dict = {'inventory_wuwainventorykamera.json': (INVENTORY['items'], dict)}, START_DATE: str = ''):
     savePATH = os.path.join(cfg.get(cfg.exportFolder), START_DATE)
@@ -33,14 +37,8 @@ def savingScraped(scannedData: dict = {'inventory_wuwainventorykamera.json': (IN
         for filename, (data, emptyType) in scannedData.items():
             if data != emptyType():
                 filePATH = os.path.join(savePATH, filename)
-                with open(filePATH, 'w', encoding='UTF-8') as f:
+                with open(filePATH, 'w', encoding='utf-8') as f:
                     json.dump(data, f)
-
-def scaleWidth(value, width):
-    return int(value / 1920 * width)
-
-def scaleHeight(value, height):
-    return int(value / 1080 * height)
 
 def screenshot(left: int = 0, top: int = 0, width: int = 0, height: int = 0, bw: bool = False):
 
@@ -130,7 +128,7 @@ def imageToString(
         for row in groupedLines:
             finalOutput.append(divisor.join(row))
         
-        return '\n'.join(finalOutput)
+        return '\n'.join(finalOutput).strip()
 
     except:
         return ''

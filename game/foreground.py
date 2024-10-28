@@ -58,7 +58,7 @@ class WindowFocusManager:
 				pPATH = self.process_utils.getPPATH(pID)
 				pName = self.process_utils.getPNAME(pPATH) if pPATH else None
 
-				logger.debug(f"Window handle: {hwnd}, PID: {pID}, Path: {pPATH}, Name: {pName}")
+				logger.debug(f"Window handle: {hwnd}, PID: {pID}, Name: {pName}")
 
 				if pName == PROCESS_NAME:
 					WindowFocusManager.PROCESS_ID = pID

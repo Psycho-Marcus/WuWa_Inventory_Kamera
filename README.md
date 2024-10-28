@@ -7,12 +7,13 @@ The data format is specifically designed for [WuWa Tracker](https://wuwatracker.
 *Note: This tool currently works __only__ in full-screen mode.*
 
 - **Supported Screens:**
+  - 1680x1050
   - 1920x1080
   - 2560x1440
   - (other resolutions not tested; may not be compatible)
 
 - **Supported Languages:**
-  - English
+  - All (tested only with English)
 
 - **Features:**
   - Scan Characters
@@ -26,12 +27,12 @@ The data format is specifically designed for [WuWa Tracker](https://wuwatracker.
 ## To-Do List
 - [x] Character Scanner (no echo)
 - [x] Weapons Scanner
-- [x] Echoes Scanner (really slow at the moment)
+- [x] Echoes Scanner
 - [x] Achievements Scanner
 - [ ] Auto Updater
-- [ ] Support for additional in-game languages
+- [x] Support for additional in-game languages
 - [ ] Support for more software languages
-- [ ] Improve text recognition accuracy
+- [x] Improve text recognition accuracy
 - [ ] Improve logs
 - [ ] Optimize releases size
 - [ ] Rewrite the code (after all tasks are complete; this is urgently needed)

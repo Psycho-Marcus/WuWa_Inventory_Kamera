@@ -2,19 +2,18 @@ import logging
 import string
 
 from scraping.utils import (
-	scaleWidth, scaleHeight, screenshot,
-	imageToString
+	screenshot, imageToString
 )
+from game.screenInfo import ScreenInfo
 
 logger = logging.getLogger('ShellScraper')
 
-def getShell(WIDTH, HEIGHT):
-
+def getShell(screenInfo: ScreenInfo):
 	xShell, yShell, wShell, hShell = (
-		scaleWidth(1255, WIDTH),
-		scaleHeight(38, HEIGHT),
-		scaleWidth(165, WIDTH),
-		scaleHeight(50, HEIGHT)
+		screenInfo.scaleWidth((1255, 1100)),
+		screenInfo.scaleHeight((38, 35)),
+		screenInfo.scaleWidth((165, 145)),
+		screenInfo.scaleHeight((50, 40))
 	)
 
 	image = screenshot(xShell, yShell, wShell, hShell, True)

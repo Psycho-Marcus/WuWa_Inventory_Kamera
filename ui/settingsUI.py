@@ -15,7 +15,7 @@ from qfluentwidgets import (
 from ui.custom_widgets import FieldSettingCard
 from properties.config import (
 	cfg, alphabethList, maxLength,
-	HELP_URL, FEEDBACK_URL
+	HELP_URL, FEEDBACK_URL, LANGUAGES
 )
 
 logger = logging.getLogger('SettingInterface')
@@ -81,11 +81,11 @@ class SettingInterface(ScrollArea):
 			parent=self.inGameGroup
 		)
 		self.languageGame = ComboBoxSettingCard(
-			cfg.gameLanguages,
+			cfg.gameLanguage,
 			FIF.LANGUAGE,
 			self.tr('Language'),
 			self.tr('Set the language you use in game'),
-			['English'],
+			list(LANGUAGES),
 			self.inGameGroup
 		)
 		self.inventoryKey = ComboBoxSettingCard(
@@ -168,6 +168,7 @@ class SettingInterface(ScrollArea):
 		InfoBar.warning(
 			'',
 			self.tr('Configuration takes effect after restart'),
+			duration=2500,
 			parent=self.window()
 		)
 
@@ -185,7 +186,7 @@ class SettingInterface(ScrollArea):
 
 	def __connectSignals(self):
 		"""Connect signals to their respective slots."""
-		cfg.appRestartSig.connect(self.__showRestartTooltip)
+		cfg.gameLanguage.valueChanged.connect(self.__showRestartTooltip)
 		cfg.themeChanged.connect(self.__onThemeChanged)
 		self.exportFolderCard.clicked.connect(self.__onExportFolderCardClicked)
 		self.feedbackCard.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(FEEDBACK_URL)))

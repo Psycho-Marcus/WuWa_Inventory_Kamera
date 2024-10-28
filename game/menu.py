@@ -1,11 +1,12 @@
 import time
 import logging
+from difflib import get_close_matches
 
 from game.screenSize import WindowManager
 from game.foreground import WindowFocusManager
+from scraping.utils.common import definedText
 from scraping.utils import (
-    scaleWidth, scaleHeight, screenshot,
-    imageToString
+    screenshot, imageToString
 )
 
 logger = logging.getLogger('MainMenuController')
@@ -21,17 +22,18 @@ class MainMenuController:
             bool: True if the main menu is detected, False otherwise.
         """
         try:
+            screenInfo = WindowManager.getScreenInfo()
             image = screenshot(
-                scaleWidth(140, WindowManager.getWidth()),
-                scaleHeight(40, WindowManager.getHeight()),
-                scaleWidth(150, WindowManager.getWidth()),
-                scaleHeight(40, WindowManager.getHeight())
+                screenInfo.scaleWidth((140, 132)),
+                screenInfo.scaleHeight((40, 32)),
+                screenInfo.scaleWidth(150),
+                screenInfo.scaleHeight(40)
             )
 
             result = imageToString(image, '').lower()
             logger.debug(f"Detected text from screenshot: '{result}'")
             
-            return result == 'terminal' # MULTILANG
+            return  'terminal' if get_close_matches(result, [definedText['PrefabTextItem_1547656443_Text']]) else 'none' # MULTILANG
         except Exception as e:
             logger.error(f"Failed to capture or process screenshot: {e}")
             return False
@@ -51,9 +53,6 @@ class MainMenuController:
             if result[0] == 'error':
                 return result
             time.sleep(.2)
-            WindowManager.updateWindowSize()
-
-            time.sleep(1)
 
             if not self.isMenu():
                 return 'error', 'Error', 'Not in the main menu. Press ESC in-game and rerun the scanner.'

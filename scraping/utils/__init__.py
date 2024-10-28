@@ -1,12 +1,12 @@
 from scraping.utils.common import (
     itemsID, charactersID, weaponsID,
     echoesID, achievementsID, echoStats,
-    definedText
+    definedText, sonataName
 )
 
 from scraping.utils.common import (
-    savingScraped, scaleWidth, scaleHeight,
-    screenshot, convertToBlackWhite, imageToString
+    savingScraped, screenshot, convertToBlackWhite,
+    imageToString
 )
 
 from scraping.utils.mouse_keyboard import (

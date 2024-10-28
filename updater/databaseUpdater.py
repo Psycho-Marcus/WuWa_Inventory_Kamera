@@ -3,13 +3,15 @@ import re
 import json
 import urllib.request
 import logging
+from babel import Locale
 from dataclasses import dataclass
+from PySide6.QtCore import QObject, Signal
 
-from properties.config import basePATH
+from properties.config import basePATH, cfg
 from scraping.utils import (
 	itemsID, charactersID, weaponsID,
 	echoesID, achievementsID, echoStats,
-	definedText
+	definedText, sonataName
 )
 
 logger = logging.getLogger('DatabaseManager')
@@ -19,26 +21,57 @@ class FileConfig:
 	folder: list[str]
 	file: str
 
-class DataUpdater:
+class DataUpdater(QObject):
+	updateProgress = Signal(int, str)
+	updateFinished = Signal()
+
 	API = 'https://api.github.com/repos/{owner}/{repo}/contents/{path}'
 	
 	def __init__(self):
+		super().__init__()
 		self.author = 'Dimbreath'
 		self.repo = 'WutheringData'
+		self.lang = self._getLanguage()
 		self.files = [
-			FileConfig(['TextMap', 'en'], 'MultiText.json'),
+			FileConfig(['TextMap', self.lang], 'MultiText.json'),
 			FileConfig(['ConfigDB'], 'ItemInfo.json'),
 			FileConfig(['ConfigDB'], 'WeaponConf.json'),
 		]
 		self.updated = False
 
+	def _getLanguage(self) -> str:
+		self.makeFolder()
+
+		url = self.API.format(
+			owner=self.author,
+			repo=self.repo,
+			path='TextMap'
+		)
+		uLang = cfg.get(cfg.gameLanguage)
+		languages = self.loadJson('languages.json')
+		
+		if uLang not in languages:
+			languages = {self._getLanguageName(item['name']): item['name'] for item in self.fetchFileData(url) if item['type'] == 'dir'}
+			self.saveJson(languages, 'languages.json')
+
+		return languages.get(uLang, 'en')
+
 	def makeFolder(self):
 		os.makedirs('data', exist_ok=True)
 		logger.debug("Ensured 'data' directory exists.")
 
+	def _getLanguageName(self, code: str) -> str:
+		parts = code.split('-')
+		locale = Locale(parts[0], script=parts[1] if len(parts) != 1 else None)
+		try: return locale.get_display_name().capitalize()
+		except: return code
+
 	def fetchFileData(self, url: str) -> dict:
-		with urllib.request.urlopen(urllib.request.Request(url)) as response:
-			return json.loads(response.read().decode())
+		try:
+			with urllib.request.urlopen(urllib.request.Request(url)) as response:
+				return json.loads(response.read().decode())
+		except:
+			return {}
 
 	def updateFiles(self):
 		for fileConfig in self.files:
@@ -57,23 +90,35 @@ class DataUpdater:
 
 				if data['size'] != currentSize:
 					logger.info(f'Downloading updated version of {fileConfig.file}...')
-					urllib.request.urlretrieve(data['download_url'], filePath)
+					urllib.request.urlretrieve(
+						data['download_url'],
+						filePath,
+						reporthook=lambda block_num, block_size, total_size: self.reportProgress(fileConfig.file, block_num, block_size, total_size)
+					)
 					self.updated = True
 					logger.info(f'File updated: {fileConfig.file}')
-					
 			except Exception as e:
 				logger.error(f'Failed to update {fileConfig.file}. Error: {str(e)}')
+	
+	
+	def reportProgress(self, file_name, block_num, block_size, total_size):
+		downloaded = block_num * block_size
+		percent = (downloaded / total_size)*100
+		self.updateProgress.emit(percent, file_name)
 
 	def loadJson(self, filename: str) -> dict:
-		with open(f'./data/{filename}', 'r', encoding='utf-8') as f:
-			return json.load(f)
+		try:
+			with open(f'./data/{filename}', 'r', encoding='utf-8') as f:
+				return json.load(f)
+		except:
+			return dict()
 
 	def saveJson(self, data: dict, filename: str):
 		with open(f'./data/{filename}', 'w', encoding='utf-8') as f:
 			json.dump(data, f, indent=4)
 
 	def updateItems(self):
-		if self.updated or not os.path.isfile('./data/items.json'):
+		if not os.path.isfile('./data/items.json'):
 			logger.info('Updating items.json...')
 			try:
 				infoText = self.loadJson('MultiText.json')
@@ -103,12 +148,12 @@ class DataUpdater:
 
 				itemsID.update(items)
 				weaponsID.update(weapons)
-
+				
 			except Exception as e:
 				logger.error(f'Failed to update items.json. Error: {str(e)}')
 
 	def updateJsonFromPattern(self, fileName: str, pattern: str, transformFunc):
-		if self.updated or not os.path.isfile(fileName):
+		if not os.path.isfile(fileName):
 			logger.info(f'Updating {fileName}...')
 			try:
 				infoText = self.loadJson('MultiText.json')
@@ -186,36 +231,42 @@ class DataUpdater:
 		except Exception as e:
 			logger.error(f'Failed to update echoStats. Error: {str(e)}')
 
+	def updateSonata(self):
+		data = self.updateJsonFromPattern(
+			'sonataName.json',
+			r'^PhantomFetter_(\d+)_Name$',
+			lambda text, _: text.lower().replace(' ', '')
+		)
+		if data:
+			sonataName.extend(list(data))
+
 	def updateDefinedText(self):
 		textKey = [
-			'PrefabTextItem_1547656443_Text', # Terminal
-			'PrefabTextItem_2954494437_Text', # Complete
-			'PrefabTextItem_2829957711_Text', # Ongoing
-			'PrefabTextItem_128820487_Text', # Claim
-			'PrefabTextItem_Activate_Text', # Activate
-			'PrefabtextItem_Rogueskilltree_Max', # Activated
-			'SkillType_4_TypeName', # Inherent Skill
-			'VisionSkillTitle' # Echo Skill
+			'PrefabTextItem_1547656443_Text',  # Terminal
+			'PrefabTextItem_128820487_Text',   # Claim
+			'PrefabTextItem_3963945691_Text'   # Activated
 		]
 
 		try:
 			infoText = self.loadJson('MultiText.json')
 			
-			stats = [infoText[key].lower().replace(' ', '').replace('-', '').strip()
-					 for key in textKey]
+			stats = {key: infoText[key].lower().replace(' ', '').replace('-', '').strip()
+					 for key in textKey}
 			
 			self.saveJson(stats, 'definedText.json')
-			definedText.extend(stats)
+			definedText.update(stats)
 			
 		except Exception as e:
 			logger.error(f'Failed to update definedText. Error: {str(e)}')
 
 	def run(self):
-		self.makeFolder()
 		self.updateFiles()
-		self.updateItems()
-		self.updateEchoStats()
-		self.updateDefinedText()
-		self.updateAchievements()
-		self.updateCharacters()
-		self.updateEcho()
+		if self.updated:
+			self.updateItems()
+			self.updateEchoStats()
+			self.updateSonata()
+			self.updateDefinedText()
+			self.updateAchievements()
+			self.updateCharacters()
+			self.updateEcho()
+		self.updateFinished.emit()

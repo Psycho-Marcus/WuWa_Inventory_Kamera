@@ -1,15 +1,19 @@
+import os
 import cv2
 import string
 import numpy as np
 from difflib import get_close_matches
 from collections import defaultdict
 
-from scraping.utils import echoesID, echoStats
 from scraping.utils import (
-    scaleWidth, scaleHeight, screenshot,
-    imageToString, convertToBlackWhite, mouseScroll,
-    leftClick, presskey
+    echoesID, echoStats, sonataName
 )
+from scraping.utils import (
+    screenshot, imageToString, convertToBlackWhite,
+    moveMouse, mouseScroll, leftClick,
+    presskey
+)
+from game.screenInfo import ScreenInfo
 from properties.config import cfg
 
 # Constants
@@ -28,26 +32,27 @@ class ROI_Info:
         self.height = height
         self.coords = coords
 
-def scaleCoordinates(coords: dict[str, tuple[int, int, int, int]], width: int, height: int) -> dict[str, Coordinates]:
+def scaleCoordinates(coords: dict[str, tuple[int, int, int, int]], screenInfo: ScreenInfo) -> dict[str, Coordinates]:
     return {
         key: Coordinates(
-            scaleWidth(x, width),
-            scaleHeight(y, height),
-            scaleWidth(w, width),
-            scaleHeight(h, height)
+            screenInfo.scaleWidth(x),
+            screenInfo.scaleHeight(y),
+            screenInfo.scaleWidth(w),
+            screenInfo.scaleHeight(h)
         )
         for key, (x, y, w, h) in coords.items()
     }
 
-def getROI(width: int, height: int) -> ROI_Info:
+def getROI(screenInfo: ScreenInfo) -> ROI_Info:
     unscaled_coords = {
-        'page': (200, 50, 130, 40),
-        'start': (205, 122, 151, 181),
-        'echoCard': (1296, 114, 558, 170),
-        'fullStatsName': (1380, 430, 360, 380),
-        'fullStatsValue': (1740, 430, 100, 380),
+        'page': ((200, 175), (50, 40), 130, 40),
+        'start': ((205, 180), (122, 104), (151, 130), (181, 162)),
+        'echoCard': ((1296, 1136), (114, 152), (558, 486), 170),
+        'sonata': ((1298, 1135), (397, 400), (554, 486), (467, 408)),
+        'fullStatsName': ((1380, 1200), (430, 420), (360, 320), 380),
+        'fullStatsValue': ((1740, 1510), (430, 420), 100, 380),
     }
-    return ROI_Info(width, height, scaleCoordinates(unscaled_coords, width, height))
+    return ROI_Info(screenInfo.width, screenInfo.height, scaleCoordinates(unscaled_coords, screenInfo))
 
 def matchStats(text):
     stats = set(echoStats)
@@ -82,7 +87,6 @@ def setupRarityDetection():
 RARITY_BOUNDS = setupRarityDetection()
 
 def getRarity(image: np.ndarray):
-
     for rarity, (lower, upper) in RARITY_BOUNDS.items():
         if np.any(cv2.inRange(image, lower, upper)):
             return rarity
@@ -96,7 +100,7 @@ def getEchoPages(roiInfo: ROI_Info) -> int:
     try: return int(echoCount), int(np.ceil(int(echoCount) / 24))
     except ValueError: return 24, 1
 
-def processEcho(name: str, level: int, tuneLv: int, rarity: int, stats: dict) -> dict[str, dict[int, int, dict]]:
+def processEcho(name: str, level: int, tuneLv: int, sonata: str, rarity: int, stats: dict) -> dict[str, dict[int, int, dict]]:
     result = get_close_matches(name, echoesID, 1, 0.9)
     if result: name = result[0]
     
@@ -105,6 +109,7 @@ def processEcho(name: str, level: int, tuneLv: int, rarity: int, stats: dict) ->
         echoID: {
             'level': level,
             'tuneLv': tuneLv,
+            'sonata': sonata,
             'rarity': rarity,
             'stats': stats
         }
@@ -150,14 +155,37 @@ def processStats(image: np.ndarray, roiInfo: ROI_Info, _cache: dict) -> dict[str
         if index < 2: stat = 'main'
         else: stat = 'sub'
         
-        if statValue.endswith('%'):
-            stats[stat].update({f"{statName}%": float(statValue[:-1])})
-        else:
-            stats[stat].update({statName: int(statValue)})
+        try:
+            if statValue.endswith('%'):
+                stats[stat].update({f"{statName}%": float(statValue[:-1])})
+            else:
+                stats[stat].update({statName: int(statValue)})
+        except:
+            stats[stat].update({statName: statValue})
 
     return tuneLv, dict(stats)
 
-def processGridEcho(echoes: list, image: np.ndarray, roiInfo: ROI_Info, _cache: dict) -> tuple[dict[str, int], list[dict[str, dict[str, int]]]]:
+def getSonata(screenInfo: ScreenInfo, coords: dict[str, Coordinates], _cache: dict):
+    moveMouse(screenInfo.scaleWidth(1576.5), screenInfo.scaleHeight(665.5), .2)
+    mouseScroll(-70, .3)
+    image = screenshot(coords['sonata'].x, coords['sonata'].y, coords['sonata'].w, coords['sonata'].h)
+    sonataHash = hash(image.tobytes())
+
+    if sonataHash in _cache:
+        sonata = _cache[sonataHash]
+    else:
+        sonata = imageToString(image, '', bannedChars=' ').lower()
+        for name in sonataName:
+            if name in sonata:
+                _cache[sonataHash] = name
+                sonata = name
+                break
+    
+    moveMouse(screenInfo.scaleWidth(1576.5), screenInfo.scaleHeight(665.5), .2)
+    mouseScroll(70, .3)
+    return sonata
+
+def processGridEcho(screenInfo: ScreenInfo, echoes: list, image: np.ndarray, roiInfo: ROI_Info, _cache: dict[str, list]) -> tuple[dict[str, int], list[dict[str, dict[str, int]]]]:
     coords = roiInfo.coords
 
     echoCard = image[coords['echoCard'].y:coords['echoCard'].y + coords['echoCard'].h, coords['echoCard'].x:coords['echoCard'].x + coords['echoCard'].w]
@@ -170,13 +198,9 @@ def processGridEcho(echoes: list, image: np.ndarray, roiInfo: ROI_Info, _cache: 
     name = info[0][0]
     
     if name in echoesID:
-        if echoHash in _cache:
-            try:
-                rarity = info[1][0]
-            except:
-                rarity = getRarity(echoCard)
-                _cache[echoHash].append(rarity)
-        else:
+        try:
+            rarity = info[1][0]
+        except:
             rarity = getRarity(echoCard)
             _cache[echoHash].append(rarity)
         
@@ -189,16 +213,17 @@ def processGridEcho(echoes: list, image: np.ndarray, roiInfo: ROI_Info, _cache: 
 
             if level >= cfg.get(cfg.echoMinLevel):
                 tuneLv, stats = processStats(image, roiInfo, _cache)
-                echoes.append(processEcho(name, level, tuneLv, rarity, stats))
+                sonata = getSonata(screenInfo, coords, _cache)
+                echoes.append(processEcho(name, level, tuneLv, sonata, rarity, stats))
                 return True
         return False
 
     return True
 
-def echoScraper(x: float, y: float, width: int, height: int) -> tuple[dict[str, int], list[dict[str, dict[str, int]]]]:
+def echoScraper(x: float, y: float, screenInfo: ScreenInfo) -> tuple[dict[str, int], list[dict[str, dict[str, int]]]]:
     echoes = list()
     _cache = dict()
-    roiInfo = getROI(width, height)
+    roiInfo = getROI(screenInfo)
     scrollValue = -31.25
 
     presskey(cfg.get(cfg.inventoryKeybind), 2, False)
@@ -215,13 +240,13 @@ def echoScraper(x: float, y: float, width: int, height: int) -> tuple[dict[str, 
                     return echoes
 
                 startCoords = roiInfo.coords['start']
-                center_x = startCoords.x + (col * (startCoords.w + scaleWidth(16, width))) + startCoords.w // 2
-                center_y = startCoords.y + (row * (startCoords.h + scaleHeight(24, height))) + startCoords.h // 2
+                center_x = startCoords.x + (col * (startCoords.w + screenInfo.scaleWidth(16))) + startCoords.w // 2
+                center_y = startCoords.y + (row * (startCoords.h + screenInfo.scaleHeight(24))) + startCoords.h // 2
                 
                 leftClick(center_x, center_y)
-                image = screenshot(width=width, height=height)
+                image = screenshot(width=screenInfo.width, height=screenInfo.height)
                 
-                continueScraping = processGridEcho(echoes, image, roiInfo, _cache)
+                continueScraping = processGridEcho(screenInfo, echoes, image, roiInfo, _cache)
                 if not continueScraping:
                     del _cache
                     return echoes
