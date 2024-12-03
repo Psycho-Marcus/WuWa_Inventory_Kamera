@@ -1,5 +1,3 @@
-name: Bug Report
-description: File a bug report.
 title: "[Bug] "
 body:
   - type: textarea
@@ -15,7 +13,7 @@ body:
     attributes:
       label: To Reproduce
       description: Tell us how to reproduce the bug.
-      value: "Steps to reproduce the behavior:  1. Go to '...'  2. Click on '....'  3. Scroll down to '....'  4. See error"
+      value: "Steps to reproduce the behavior:\n1. Go to '...'\n2. Click on '....'\n3. Scroll down to '....'\n4. See error"
     validations:
       required: false
   - type: dropdown
@@ -23,6 +21,7 @@ body:
     attributes:
       label: Version
       description: What version of our software are you running?
+      multiple: false
       options:
         - 1.6.0
         - 1.5.4
@@ -40,6 +39,8 @@ body:
         - 1920x1080
         - 2560x1440
         - Other (specify in description)
+    validations:
+      required: true
   - type: checkboxes
     id: multi-screen
     attributes:
