@@ -34,8 +34,8 @@ The data format is specifically designed for [WuWa Tracker](https://wuwatracker.
 - [ ] Support for more software languages
 - [x] Improve text recognition accuracy
 - [ ] Improve logs
-- [ ] Optimize releases size
-- [ ] Rewrite the code (after all tasks are complete; this is urgently needed)
+- [x] Optimize releases size
+- [ ] Rewrite the code (after all tasks are complete)
 
 ## Tutorial
 
@@ -44,7 +44,7 @@ The data format is specifically designed for [WuWa Tracker](https://wuwatracker.
    ![menu](https://telegra.ph/file/12abde4d5ffdfb68c0142.png)
 
 2. **Complete the Scanning Process**
-   - Once scanning is complete (note: there is currently no indicator that the process is finished), open WuWa Inventory Kamera. You should see something similar to the image below:  
+   - Once scanning is complete, open WuWa Inventory Kamera. You should see something similar to the image below:  
    ![complete](https://telegra.ph/file/a50eba86bcb813e82b919.png)
 
 3. **(Optional) Review Scanned Data**
@@ -54,7 +54,8 @@ The data format is specifically designed for [WuWa Tracker](https://wuwatracker.
 
 ## Credits
 - Highly inspired by [Inventory Kamera](https://github.com/Andrewthe13th/Inventory_Kamera) created by [Andrewthe13th](https://github.com/Andrewthe13th)
-- Item IDs sourced from [Dimbreath](https://github.com/Dimbreath)
+- Item IDs sourced from [Dimbreath](https://github.com/Dimbreath/WutheringData)
+- Assets sourced from [Stormy Waves](https://github.com/Stormy-Waves/WW_Icon)
 
 ## License
 This project is licensed under the [GNU General Public License (GPL) v3](https://www.gnu.org/licenses/gpl-3.0.html).  

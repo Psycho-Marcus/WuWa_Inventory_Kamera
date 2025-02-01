@@ -1,76 +1,88 @@
+import re
 import ctypes
 import logging
+import win32gui
+import win32con
 
-from game.navigation import ProcessUtils
+import pywinctl as pwc
+import pymonctl as pmc
+
+from game.screenInfo import ScreenInfo
 from properties.config import PROCESS_NAME, WINDOW_NAME
 
-logger = logging.getLogger('WindowFocusManager')
+logger = logging.getLogger('WindowManager')
 
-# Constants
-SW_RESTORE = 9
-HWND_TOPMOST = -1
-SWP_NOSIZE = 0x0001
-SWP_NOMOVE = 0x0002
-SWP_NOACTIVATE = 0x0004
+class WindowManager:
+	def __init__(self, windowName: str = WINDOW_NAME, preocessName: str = PROCESS_NAME):
+		self.user32 = ctypes.WinDLL('user32', use_last_error=True)
+		self.windowName = windowName
+		self.preocessName = preocessName
+		self.window = self._findWindow()
 
-class WindowFocusManager:
-	"""Handles operations to bring a window to the foreground and set its properties."""
+	def _findWindow(self) -> pwc.Window|None:
+		"""Finds the window by title and process name."""
+		for win in pwc.getWindowsWithTitle(title=self.windowName, app=self.preocessName, condition=pwc.Re.CONTAINS):
+			return win
+		logger.debug(f"Window with WindowName: {self.windowName} and ProcessName: {self.preocessName}, not found.")
+		return None
+
+	def setForeground(self) -> tuple:
+		"""Brings the window to the foreground and maximizes it."""
+		if self.window:
+			# self.window.maximize()
+			self.window.activate()
+			win32gui.PostMessage(self.window._hWnd, win32con.WM_ACTIVATE, win32con.WA_ACTIVE, 0)
+
+			logger.debug(f"Window {self.windowName} set to foreground.")
+			return ("success", "Success", "pass")
+		else:
+			logger.debug(f"Cannot set {self.windowName} in foreground: window not found.")
+			return ("error", "Error", f"Cannot set {self.windowName} in foreground: window not found.")
+
+	def getWindowPosition(self) -> pmc.Point|None:
+		"""Return the window's position."""
+		if self.window:
+			return self.window.position
+		else:
+			logger.debug("Cannot retrieve window position: window not found.")
+			return None
 	
-	PROCESS_ID = None
+	def getWindowSize(self) -> tuple[int, int]|None:
+		"""Return the window's size."""
+		if self.window:
+			return self.window.width, self.window.height
+		else:
+			logger.debug("Cannot retrieve window size: window not found.")
+			return None
+	
+	def getScreenInfo(self) -> ScreenInfo:
+		width, height = self.getWindowSize() or (1920, 1080)
 
-	def __init__(self):
-		self.process_utils = ProcessUtils()
+		DPI = self.getDPI()
+		monitor = self.window.getDisplay()[0] # ['\\\\.\\DISPLAY1']
+		match = re.search(r'\d+', monitor)
+		if match: monitor = int(match.group())
+		else: monitor = 1
+		
+		width = int(width / DPI)
+		height = int(height / DPI)
+		
+		return ScreenInfo(width, height, monitor)
 
-	@classmethod
-	def setGamePID(cls, pID):
-		"""Class method to retrieve the PROCESS_ID."""
-		cls.PROCESS_ID = pID
+	def _getScreen(self) -> pmc.Monitor:
+		"""Return the primary screen object."""
+		return pmc.getAllMonitors()[0]
 
-	@classmethod
-	def getGamePID(cls):
-		"""Class method to retrieve the PROCESS_ID."""
-		return cls.PROCESS_ID
+	def getScreenSize(self) -> tuple[int, int]:
+		"""Retrieves the primary screen size."""
+		screen = self._getScreen()
+		return screen.size.width, screen.size.height
 
-	def _setForeground(self, hwnd):
-		"""Restore, bring to foreground, and set the window as topmost."""
-		ctypes.windll.user32.ShowWindow(hwnd, SW_RESTORE)
-		ctypes.windll.user32.SetForegroundWindow(hwnd)
-		ctypes.windll.user32.SetWindowPos(
-			hwnd, HWND_TOPMOST, 0, 0, 0, 0,
-			SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE
-		)
+	def getDPI(self) -> float:
+		return self.user32.GetDpiForWindow(self.window._hWnd) / 96.0
 
-	def setForeground(self):
-		"""Find window by title and focus it if its process matches the given process name."""
-		try:
-			matching_windows = self.process_utils.getWindowByTitle(WINDOW_NAME)
-			
-			logger.debug(f"Looking for windows with title '{WINDOW_NAME}'")
-			logger.debug(f"Found {len(matching_windows)} matching windows")
-
-			if not matching_windows:
-				logger.warning(f"No window found with title '{WINDOW_NAME}'")
-				return 'error', 'No window found', 'No window with the specified title was found.'
-
-			for win in matching_windows:
-				hwnd = win._hWnd
-				pID = self.process_utils.getPID(hwnd)
-				pPATH = self.process_utils.getPPATH(pID)
-				pName = self.process_utils.getPNAME(pPATH) if pPATH else None
-
-				logger.debug(f"Window handle: {hwnd}, PID: {pID}, Name: {pName}")
-
-				if pName == PROCESS_NAME:
-					WindowFocusManager.PROCESS_ID = pID
-					logger.info(f"Found matching process. Set PROCESS_ID to {pID}.")
-					self._setForeground(hwnd)
-					return '', '', ''
-				else:
-					logger.debug(f"Process name '{pName}' does not match expected '{PROCESS_NAME}'")
-
-			logger.warning(f"No window found with process name '{PROCESS_NAME}'")
-			return 'error', 'Window not found', 'Window with the specified process name not found.'
-
-		except Exception as e:
-			logger.error(f"Exception occurred in setForeground: {str(e)}", exc_info=True)
-			return 'error', 'Exception occurred', str(e)
+	def isForeground(self) -> bool:
+		"""Check if the window is still in foreground."""
+		if self.window:
+			return self.window.isActive
+		return False

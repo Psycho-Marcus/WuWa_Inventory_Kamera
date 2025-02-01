@@ -69,7 +69,6 @@ class FieldSettingCard(SettingCard):
 		qconfig.set(self.configItem, value)
 
 
-
 class CustomSpinBox(SpinBox):
 	def __init__(self, placeholder='Value', minRange=0, maxRange=100, parent=None):
 		super().__init__(parent)

@@ -1,5 +1,5 @@
-import os
 import logging
+from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QIcon
@@ -33,7 +33,7 @@ class DataUpdaterThread(QThread):
 			self.dataUpdater.run()
 			logger.info("Data update process completed successfully")
 		except Exception as e:
-			logger.error(f"Error during data update: {str(e)}", exc_info=True)
+			logger.error(f"Error during data update: {e}", exc_info=True)
 
 class AssetsUpdaterThread(QThread):
 	updateProgress = Signal(int, str)
@@ -52,7 +52,7 @@ class AssetsUpdaterThread(QThread):
 			self.assetsUpdater.run()
 			logger.info("Assets update process completed successfully")
 		except Exception as e:
-			logger.error(f"Error during assets update: {str(e)}", exc_info=True)
+			logger.error(f"Error during assets update: {e}", exc_info=True)
 
 class LoadingScreen(QWidget):
 	def __init__(self):
@@ -65,7 +65,7 @@ class LoadingScreen(QWidget):
 	def initWindow(self):
 		logger.debug("Setting up window properties")
 		self.setFixedSize(1150, 700)
-		self.setWindowIcon(QIcon(os.path.join(basePATH, 'assets', 'icon.ico')))
+		self.setWindowIcon(QIcon(str(basePATH / 'assets' / 'icon.ico')))
 		self.setWindowTitle('WuWa Inventory Kamera')
 
 		desktop = QApplication.primaryScreen().availableGeometry()
@@ -122,4 +122,4 @@ class LoadingScreen(QWidget):
 			self.main_window.show()
 			logger.info("Main window displayed successfully")
 		except Exception as e:
-			logger.error(f"Error initializing main window: {str(e)}", exc_info=True)
+			logger.error(f"Error initializing main window: {e}", exc_info=True)

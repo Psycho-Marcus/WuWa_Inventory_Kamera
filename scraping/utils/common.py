@@ -1,9 +1,11 @@
 import re
-import os
 import mss
 import cv2
 import json
+import ctypes
 import numpy as np
+import win32clipboard
+from pathlib import Path
 
 from properties.config import (
     cfg, INVENTORY, ocr
@@ -29,27 +31,31 @@ definedText: dict = loadFile('./data/definedText.json')
 sonataName: list = loadFile('./data/sonataName.json', [])
 
 def savingScraped(scannedData: dict = {'inventory_wuwainventorykamera.json': (INVENTORY['items'], dict)}, START_DATE: str = ''):
-    savePATH = os.path.join(cfg.get(cfg.exportFolder), START_DATE)
+    savePATH: Path = Path(cfg.get(cfg.exportFolder)) / START_DATE
     
     if any(data != emptyType() for data, emptyType in scannedData.values()):
-        os.makedirs(savePATH, exist_ok=True)
+        savePATH.mkdir(parents=True, exist_ok=True)
 
         for filename, (data, emptyType) in scannedData.items():
             if data != emptyType():
-                filePATH = os.path.join(savePATH, filename)
+                filePATH = savePATH / filename
                 with open(filePATH, 'w', encoding='utf-8') as f:
                     json.dump(data, f)
 
-def screenshot(left: int = 0, top: int = 0, width: int = 0, height: int = 0, bw: bool = False):
-
-    region = {
-        'left': left,
-        'top': top,
-        'width': width,
-        'height': height
-    }
+def screenshot(left: int = 0, top: int = 0, width: int = 0, height: int = 0, monitor: int = 1, bw: bool = False):
 
     with mss.mss() as sct:
+        mon = sct.monitors[monitor]
+        if all(coord == 0 for coord in [top, left, width, height]):
+            left, top, width, height = tuple(coord for coord in mon.values())
+
+        region = {
+            'left': mon['left'] + left,
+            'top': mon['top'] + top,
+            'width': width,
+            'height': height,
+            'mon': monitor
+        }
         image = np.array(sct.grab(region))
         image = cv2.cvtColor(image, cv2.COLOR_RGBA2RGB)
     
@@ -132,3 +138,14 @@ def imageToString(
 
     except:
         return ''
+
+def isUserAdmin():
+    return ctypes.windll.shell32.IsUserAnAdmin()
+
+def copyToClipboard(text):
+    try:
+        win32clipboard.OpenClipboard()
+        win32clipboard.EmptyClipboard()
+        win32clipboard.SetClipboardText(text)
+    finally:
+        win32clipboard.CloseClipboard()

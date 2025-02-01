@@ -15,7 +15,7 @@ from qfluentwidgets import (
 )
 
 from ui.custom_widgets.widget import MultiplePushSettingCard
-from properties.config import cfg
+from properties.config import cfg, basePATH
 from scraping.utils.common import itemsID
 
 logger = logging.getLogger('InventoryInterface')
@@ -144,7 +144,7 @@ class InventoryInterface(ScrollArea):
 					data = json.load(file)
 					self.__populateGrid(data)
 				except json.JSONDecodeError as e:
-					logger.error(f"Error loading JSON file: {e}")
+					logger.error(f"Error loading JSON file: {e}", exc_info=True)
 
 	def __saveInventoryFile(self):
 		"""Save current inventory data to a JSON file."""
@@ -174,7 +174,7 @@ class InventoryInterface(ScrollArea):
 
 		for index, item_id in enumerate(inventory_file):
 			image, name = self._getItemInfoByID(item_id)
-			card = ItemCard(image, name, inventory_file[item_id])
+			card = ItemCard(str(basePATH / 'assets' / image), name, inventory_file[item_id])
 			self.gridLayout.addWidget(card, index // columns, index % columns)
 
 	def _getItemInfoByID(self, item_id: int):

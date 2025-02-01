@@ -10,13 +10,13 @@ logger = logging.getLogger('ShellScraper')
 
 def getShell(screenInfo: ScreenInfo):
 	xShell, yShell, wShell, hShell = (
-		screenInfo.scaleWidth((1255, 1100)),
-		screenInfo.scaleHeight((38, 35)),
-		screenInfo.scaleWidth((165, 145)),
-		screenInfo.scaleHeight((50, 40))
+		screenInfo.shell.x,
+		screenInfo.shell.y,
+		screenInfo.shell.w,
+		screenInfo.shell.h
 	)
 
-	image = screenshot(xShell, yShell, wShell, hShell, True)
+	image = screenshot(xShell, yShell, wShell, hShell, screenInfo.monitor, True)
 
 	try: shell = int(imageToString(image, allowedChars=string.digits).strip())
 	except Exception as e:

@@ -3,76 +3,82 @@ from PyInstaller.utils.win32 import versioninfo as vi
 from pathlib import Path
 import importlib.util
 
-version = (1, 6, 0, 0)
+class VersionInfo:
+    def __init__(self, versionTuple):
+        self.version = versionTuple
+        self.versionStr = '.'.join(map(str, versionTuple))
+        
+    def createVersionInfo(self):
+        return vi.VSVersionInfo(
+            ffi=self._createFixedFileInfo(),
+            kids=self._createVersionStrings()
+        )
+    
+    def _createFixedFileInfo(self):
+        return vi.FixedFileInfo(
+            filevers=self.version,
+            prodvers=self.version,
+            mask=0x3f,
+            flags=0x0,
+            OS=0x4,
+            fileType=0x1,
+            subtype=0x0,
+            date=(0, 0)
+        )
+    
+    def _createVersionStrings(self):
+        return [
+            vi.StringFileInfo([
+                vi.StringTable(
+                    u'040904B0', [
+                        vi.StringStruct(u'FileDescription', u''),
+                        vi.StringStruct(u'FileVersion', self.versionStr),
+                        vi.StringStruct(u'InternalName', u'WuWaInventoryKamera'),
+                        vi.StringStruct(u'OriginalFilename', u'WuWa_Inventory_Kamera.exe'),
+                        vi.StringStruct(u'ProductName', u'WuWa Inventory Kamera'),
+                        vi.StringStruct(u'ProductVersion', self.versionStr)
+                    ])
+            ]),
+            vi.VarFileInfo([vi.VarStruct(u'Translation', [0x0409, 0x04B0])])
+        ]
 
-version_file = vi.VSVersionInfo(
-    ffi=vi.FixedFileInfo(
-        filevers=version,
-        prodvers=version,
-        mask=0x3f,
-        flags=0x0,
-        OS=0x4,
-        fileType=0x1,
-        subtype=0x0,
-        date=(0, 0)
-    ),
-    kids=[
-        vi.StringFileInfo([
-            vi.StringTable(
-                u'040904B0', [
-                    vi.StringStruct(u'FileDescription', u'Simple Wuthering Waves Inventory scanner.'),
-                    vi.StringStruct(u'FileVersion', '.'.join(map(str, version))),
-                    vi.StringStruct(u'InternalName', u'WuWaInventoryKamera'),
-                    vi.StringStruct(u'OriginalFilename', u'WuWa_Inventory_Kamera.exe'),
-                    vi.StringStruct(u'ProductName', u'WuWa Inventory Kamera'),
-                    vi.StringStruct(u'ProductVersion', '.'.join(map(str, version)))
-                ])
-        ]),
-        vi.VarFileInfo([vi.VarStruct(u'Translation', [0x0409, 0x04B0])])
-    ]
-)
+class PackageDataCollector:
+    def __init__(self, packageName):
+        self.packageName = packageName
+        self.package = __import__(packageName)
+        self.installDir = Path(self.package.__file__).resolve().parent
+        
+    def collectDataFiles(self):
+        extensions = {
+            'onnx': '*.onnx',
+            'txt': '*.txt',
+            'yaml': '*.yaml'
+        }
+        
+        addData = []
+        for ext, pattern in extensions.items():
+            for path in self.installDir.rglob(pattern):
+                relDir = path.parent.relative_to(self.installDir)
+                if ext == 'yaml' and relDir == Path('.'):
+                    addData.append((str(path.parent / pattern), self.packageName))
+                else:
+                    targetDir = f'{self.packageName}/{relDir}' if relDir != Path('.') else self.packageName
+                    addData.append((str(path.parent), targetDir))
+        
+        return list(set(addData))
 
-def check_package_exists(package_name):
-    package_spec = importlib.util.find_spec(package_name)
-    return package_spec is not None
+versionInfo = VersionInfo((1, 7, 0, 0))
+packageData = PackageDataCollector('rapidocr_onnxruntime')
 
-if check_package_exists('rapidocr_onnxruntime'):
-    package_name = 'rapidocr_onnxruntime'
-    package = __import__(package_name)
-    install_dir = Path(package.__file__).resolve().parent
-
-    file_paths = {
-        'onnx': list(install_dir.rglob('*.onnx')),
-        'txt': list(install_dir.rglob('*.txt')),
-        'yaml': list(install_dir.rglob('*.yaml'))
-    }
-
-    add_data = []
-    for ext in ['onnx', 'txt']:
-        for path in file_paths[ext]:
-            rel_dir = path.parent.relative_to(install_dir)
-            add_data.append((str(path.parent), f'{package_name}/{rel_dir}'))
-
-    for path in file_paths['yaml']:
-        rel_dir = path.parent.relative_to(install_dir)
-        if rel_dir == Path('.'):
-            add_data.append((str(path.parent / '*.yaml'), package_name))
-        else:
-            add_data.append((str(path.parent / '*.yaml'), f'{package_name}/{rel_dir}'))
-
-    add_data = list(set(add_data))
-else:
-    add_data = []
-
-a = Analysis(
+analysisData = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
     datas=[
         ('assets', 'assets'),
-        *add_data
+        *packageData.collectDataFiles()
     ],
-    hiddenimports=['babel.dates', 'babel.numbers'],
+    hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -81,12 +87,11 @@ a = Analysis(
     optimize=0,
 )
 
+pyzData = PYZ(analysisData.pure)
 
-pyz = PYZ(a.pure)
-
-exe = EXE(
-    pyz,
-    a.scripts,
+exeData = EXE(
+    pyzData,
+    analysisData.scripts,
     [],
     exclude_binaries=True,
     name='WuWa Inventory Kamera',
@@ -96,17 +101,17 @@ exe = EXE(
     upx=True,
     console=False,
     icon='./assets/icon.ico',
-    version=version_file
+    version=versionInfo.createVersionInfo()
 )
 
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
+collectData = COLLECT(
+    exeData,
+    analysisData.binaries,
+    analysisData.zipfiles,
+    analysisData.datas,
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='main',
+    name=f"v{versionInfo.versionStr[:5]}",
     bindir='_internal'
 )

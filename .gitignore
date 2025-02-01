@@ -8,6 +8,7 @@ logs/
 data/
 export/
 config/
+_test/
 
 # Ignore assets
 assets/*

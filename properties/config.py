@@ -1,9 +1,7 @@
-import os
 import sys
 import json
 import string
-import ctypes
-
+from pathlib import Path
 from rapidocr_onnxruntime import RapidOCR
 from qfluentwidgets import (
 	qconfig, QConfig, ConfigValidator,
@@ -12,18 +10,16 @@ from qfluentwidgets import (
 	Signal
 )
 
-user32 = ctypes.windll.user32
-basePATH = getattr(sys, 'frozen', False) and sys._MEIPASS or os.getcwd()
+basePATH: Path = Path(getattr(sys, 'frozen', False) and sys._MEIPASS or Path()).parent
 ocr = RapidOCR()
 
 # Default values
 PROCESS_NAME = 'Client-Win64-Shipping.exe'
 WINDOW_NAME = 'Wuthering Waves'
-DPI_SCALING = user32.GetDpiForWindow(user32.GetForegroundWindow()) / 96.0
 INVENTORY = {'date': str(), 'items': dict()}
 FAILED: list[dict] = list()
 maxLength = 12
-try: LANGUAGES = json.load(open(os.path.join(os.path.dirname(basePATH), 'data', 'languages.json'), 'r', encoding='utf-8'))
+try: LANGUAGES = json.load(open(basePATH / 'data' / 'languages.json', 'r', encoding='utf-8'))
 except: LANGUAGES = {'English': 'en'}
 
 def alphabethList() -> list[str]:
@@ -122,7 +118,7 @@ class Config(QConfig):
 	weaponsMinLevel = ConfigItem("Scanner", "WeaponsMinLevel", 1, RangeValidator(1, 90))
 
 # Application metadata
-HELP_URL = "https://t.me/psycho_marcus"
+HELP_URL = "https://discord.gg/y6b2kMqs"
 FEEDBACK_URL = "https://github.com/Psycho-Marcus/WuWa_Inventory_Kamera/issues"
 RELEASE_URL = "https://github.com/Psycho-Marcus/WuWa_Inventory_Kamera/releases/latest"
 

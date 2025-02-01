@@ -1,6 +1,6 @@
-import os
 import logging
 import multiprocessing
+from pathlib import Path
 from logging.handlers import TimedRotatingFileHandler
 from app import start
 
@@ -15,7 +15,7 @@ def main():
 	logger.info("Application closed")
 
 def configure_logging():
-	os.makedirs('logs', exist_ok=True)
+	Path('logs').mkdir(parents=True, exist_ok=True)
 
 	# Create the formatter
 	formatter = logging.Formatter(
@@ -55,11 +55,6 @@ def configure_logging():
 	root_logger.addHandler(console_handler)
 	root_logger.addHandler(debug_file_handler)
 	root_logger.addHandler(log_file_handler)
-	
-	# Disable propagation from pyuac
-	pyuac_logger = logging.getLogger('pyuac')
-	pyuac_logger.propagate = False
-
 
 if __name__ == '__main__':
 	multiprocessing.freeze_support()

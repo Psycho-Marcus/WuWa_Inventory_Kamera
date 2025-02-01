@@ -1,13 +1,13 @@
-import os
 import re
 import json
 import urllib.request
 import logging
 from babel import Locale
+from pathlib import Path
 from dataclasses import dataclass
 from PySide6.QtCore import QObject, Signal
 
-from properties.config import basePATH, cfg
+from properties.config import cfg
 from scraping.utils import (
 	itemsID, charactersID, weaponsID,
 	echoesID, achievementsID, echoStats,
@@ -57,7 +57,7 @@ class DataUpdater(QObject):
 		return languages.get(uLang, 'en')
 
 	def makeFolder(self):
-		os.makedirs('data', exist_ok=True)
+		Path('data').mkdir(parents=True, exist_ok=True)
 		logger.debug("Ensured 'data' directory exists.")
 
 	def _getLanguageName(self, code: str) -> str:
@@ -84,9 +84,9 @@ class DataUpdater(QObject):
 			logger.info(f'Checking for updates on file: {fileConfig.file}')
 			try:
 				data = self.fetchFileData(url)
-				filePath = f'./data/{fileConfig.file}'
+				filePath: Path = Path('data') / fileConfig.file
 
-				currentSize = os.path.getsize(filePath) if os.path.isfile(filePath) else 0
+				currentSize = filePath.stat().st_size if filePath.is_file() else 0
 
 				if data['size'] != currentSize:
 					logger.info(f'Downloading updated version of {fileConfig.file}...')
@@ -98,7 +98,7 @@ class DataUpdater(QObject):
 					self.updated = True
 					logger.info(f'File updated: {fileConfig.file}')
 			except Exception as e:
-				logger.error(f'Failed to update {fileConfig.file}. Error: {str(e)}')
+				logger.error(f'Failed to update {fileConfig.file}. Error: {e}')
 	
 	
 	def reportProgress(self, file_name, block_num, block_size, total_size):
@@ -118,7 +118,7 @@ class DataUpdater(QObject):
 			json.dump(data, f, indent=4)
 
 	def updateItems(self):
-		if not os.path.isfile('./data/items.json'):
+		if not (Path('data') / 'items.json').is_file():
 			logger.info('Updating items.json...')
 			try:
 				infoText = self.loadJson('MultiText.json')
@@ -129,7 +129,7 @@ class DataUpdater(QObject):
 					infoText[item['Name']].lower().replace(' ', ''): {
 						'id': item['Id'],
 						'name': infoText[item['Name']],
-						'image': os.path.join(basePATH, 'assets', item['Icon'].split('/Image/')[1].rsplit('.', 1)[0] + '.png')
+						'image': item['Icon'].split('/Image/')[1].rsplit('.', 1)[0] + '.png'
 					}
 					for item in itemInfo if item['Name'] in infoText
 				}
@@ -138,7 +138,7 @@ class DataUpdater(QObject):
 						'id': weapon['ModelId'],
 						'name': infoText[weapon['WeaponName']],
 						'rarity': weapon['QualityId'],
-						'image': os.path.join(basePATH, 'assets', weapon['Icon'].split('/Image/')[1].rsplit('.', 1)[0] + '.png')
+						'image': weapon['Icon'].split('/Image/')[1].rsplit('.', 1)[0] + '.png'
 					}
 					for weapon in weaponInfo if weapon['WeaponName'] in infoText
 				}
@@ -150,26 +150,25 @@ class DataUpdater(QObject):
 				weaponsID.update(weapons)
 				
 			except Exception as e:
-				logger.error(f'Failed to update items.json. Error: {str(e)}')
+				logger.error(f'Failed to update items.json. Error: {e}', exc_info=True)
 
 	def updateJsonFromPattern(self, fileName: str, pattern: str, transformFunc):
-		if not os.path.isfile(fileName):
-			logger.info(f'Updating {fileName}...')
-			try:
-				infoText = self.loadJson('MultiText.json')
-				
-				data = {}
-				compiledPattern = re.compile(pattern)
-				for key in infoText:
-					if match := compiledPattern.match(key):
-						transformed = transformFunc(infoText[key], match)
-						if transformed is not None:
-							data[transformed] = int(match.group(1))
+		logger.info(f'Updating {fileName}...')
+		try:
+			infoText = self.loadJson('MultiText.json')
+			
+			data = {}
+			compiledPattern = re.compile(pattern)
+			for key in infoText:
+				if match := compiledPattern.match(key):
+					transformed = transformFunc(infoText[key], match)
+					if transformed is not None:
+						data[transformed] = int(match.group(1))
 
-				self.saveJson(data, fileName)
-				return data
-			except Exception as e:
-				logger.error(f'Failed to update {fileName}. Error: {str(e)}')
+			self.saveJson(data, fileName)
+			return data
+		except Exception as e:
+			logger.error(f'Failed to update {fileName}. Error: {e}', exc_info=True)
 
 	def updateCharacters(self):
 		data = self.updateJsonFromPattern(
@@ -229,7 +228,7 @@ class DataUpdater(QObject):
 			echoStats.update(stats)
 			
 		except Exception as e:
-			logger.error(f'Failed to update echoStats. Error: {str(e)}')
+			logger.error(f'Failed to update echoStats. Error: {e}', exc_info=True)
 
 	def updateSonata(self):
 		data = self.updateJsonFromPattern(
@@ -257,7 +256,7 @@ class DataUpdater(QObject):
 			definedText.update(stats)
 			
 		except Exception as e:
-			logger.error(f'Failed to update definedText. Error: {str(e)}')
+			logger.error(f'Failed to update definedText. Error: {e}', exc_info=True)
 
 	def run(self):
 		self.updateFiles()

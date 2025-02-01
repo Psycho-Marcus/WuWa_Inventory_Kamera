@@ -1,11 +1,11 @@
 import string
 import numpy as np
-from difflib import get_close_matches
+from difflib import get_close_matches as getMatches
 
 from scraping.utils import weaponsID, itemsID
 from scraping.utils import (
     screenshot, convertToBlackWhite, imageToString,
-    mouseScroll, leftClick, presskey
+    WindowsInputController
 )
 from game.screenInfo import ScreenInfo
 from properties.config import cfg
@@ -14,45 +14,9 @@ from properties.config import cfg
 ROWS, COLS = 4, 6
 WEAPON_ASCENSION_LEVELS = [20, 40, 50, 60, 70, 80, 90]
 
-class Coordinates:
-    def __init__(self, x: int, y: int, w: int, h: int):
-        self.x = x
-        self.y = y
-        self.w = w
-        self.h = h
-
-class ROI_Info:
-    def __init__(self, width: int, height: int, coords: dict[str, Coordinates]):
-        self.width = width
-        self.height = height
-        self.coords = coords
-
-def scaleCoordinates(coords: dict[str, tuple[int, int, int, int]], screenInfo: ScreenInfo) -> dict[str, Coordinates]:
-    return {
-        key: Coordinates(
-            screenInfo.scaleWidth(x),
-            screenInfo.scaleHeight(y),
-            screenInfo.scaleWidth(w),
-            screenInfo.scaleHeight(h)
-        )
-        for key, (x, y, w, h) in coords.items()
-    }
-
-def getROI(screenInfo: ScreenInfo) -> ROI_Info:
-    unscaled_coords = {
-        'page': ((200, 175), (50, 40), 130, 40),
-        'name': ((1305, 1140), (116, 152), (545, 480), (55, 50)),
-        'value': (1655, 320, 190, 40),
-        'level': ((1660, 1435), (235, 255), 180, 45),
-        'rank': ((1300, 1135), (530, 510), (115, 100), 50),
-        'start': ((205, 180), (122, 104), (151, 130), (181, 162)),
-    }
-    return ROI_Info(screenInfo.width, screenInfo.height, scaleCoordinates(unscaled_coords, screenInfo))
-
-def getWeaponPages(roiInfo: ROI_Info) -> int:
-    coords = roiInfo.coords['page']
-    img = convertToBlackWhite(screenshot(width=roiInfo.width, height=roiInfo.height)[coords.y:coords.y + coords.h, coords.x:coords.x + coords.w])
-    weaponCount = imageToString(img, '', allowedChars=string.digits + '/').split('/')[0]
+def getWeaponPages(screenInfo: ScreenInfo) -> int:
+    image = convertToBlackWhite(screenshot(width=screenInfo.width, height=screenInfo.height, monitor=screenInfo.monitor)[screenInfo.weapons.page.y:screenInfo.weapons.page.y + screenInfo.weapons.page.h, screenInfo.weapons.page.x:screenInfo.weapons.page.x + screenInfo.weapons.page.w])
+    weaponCount = imageToString(image, '', allowedChars=string.digits + '/').split('/')[0]
     try:
         return int(weaponCount), int(np.ceil(int(weaponCount) / 24))
     except ValueError:
@@ -77,10 +41,9 @@ def processWeapon(name: str, levelText: str, rankText: str) -> dict[str, dict[st
         }
     }
 
-def processGridItem(inventory: dict, weapons: list, image: np.ndarray, roiInfo: ROI_Info, _cache: dict) -> tuple[dict[str, int], list[dict[str, dict[str, int]]]]:
-    coords = roiInfo.coords
+def processGridItem(inventory: dict, weapons: list, image: np.ndarray, screenInfo: ScreenInfo, _cache: dict) -> tuple[dict[str, int], list[dict[str, dict[str, int]]]]:
 
-    nameImage = image[coords['name'].y:coords['name'].y + coords['name'].h, coords['name'].x:coords['name'].x + coords['name'].w]
+    nameImage = image[screenInfo.weapons.name.y:screenInfo.weapons.name.y + screenInfo.weapons.name.h, screenInfo.weapons.name.x:screenInfo.weapons.name.x + screenInfo.weapons.name.w]
     nameImage = convertToBlackWhite(nameImage)
     nameHash = hash(nameImage.tobytes())
 
@@ -88,9 +51,9 @@ def processGridItem(inventory: dict, weapons: list, image: np.ndarray, roiInfo: 
         name = _cache[nameHash]
     else:
         name = imageToString(nameImage, '', bannedChars=' ').lower()
-        result = get_close_matches(name, weaponsID, 1, 0.9)
+        result = getMatches(name, weaponsID, 1, 0.9)
         if not result:
-            result = get_close_matches(name, itemsID, 1, 0.9)
+            result = getMatches(name, itemsID, 1, 0.9)
             if not result:
                 result = [name]
         
@@ -98,7 +61,7 @@ def processGridItem(inventory: dict, weapons: list, image: np.ndarray, roiInfo: 
         name = result[0]
     
     if name in itemsID:
-        valueImage = image[coords['value'].y:coords['value'].y + coords['value'].h, coords['value'].x:coords['value'].x + coords['value'].w]
+        valueImage = image[screenInfo.weapons.value.y:screenInfo.weapons.value.y + screenInfo.weapons.value.h, screenInfo.weapons.value.x:screenInfo.weapons.value.x + screenInfo.weapons.value.w]
         valueImage = convertToBlackWhite(valueImage)
         valueHash = hash(valueImage.tobytes())
 
@@ -113,10 +76,8 @@ def processGridItem(inventory: dict, weapons: list, image: np.ndarray, roiInfo: 
         return True
     elif name in weaponsID:
         if weaponsID[name]['rarity'] >= cfg.get(cfg.weaponsMinRarity):
-            levelImage = image[coords['level'].y:coords['level'].y + coords['level'].h, coords['level'].x:coords['level'].x + coords['level'].w]
+            levelImage = image[screenInfo.weapons.level.y:screenInfo.weapons.level.y + screenInfo.weapons.level.h, screenInfo.weapons.level.x:screenInfo.weapons.level.x + screenInfo.weapons.level.w]
             # levelImage = convertToBlackWhite(levelImage)
-            import cv2
-            cv2.imwrite('./_level.png', levelImage)
             levelHash = hash(levelImage.tobytes())
 
             if levelHash in _cache:
@@ -126,7 +87,7 @@ def processGridItem(inventory: dict, weapons: list, image: np.ndarray, roiInfo: 
                 _cache[levelHash] = levelText
             
             if int(levelText.split('/')[0]) >= cfg.get(cfg.weaponsMinLevel):
-                rankImage = image[coords['rank'].y:coords['rank'].y + coords['rank'].h, coords['rank'].x:coords['rank'].x + coords['rank'].w]
+                rankImage = image[screenInfo.weapons.rank.y:screenInfo.weapons.rank.y + screenInfo.weapons.rank.h, screenInfo.weapons.rank.x:screenInfo.weapons.rank.x + screenInfo.weapons.rank.w]
                 rankImage = convertToBlackWhite(rankImage)
                 rankHash = hash(rankImage.tobytes())
 
@@ -140,16 +101,15 @@ def processGridItem(inventory: dict, weapons: list, image: np.ndarray, roiInfo: 
         return False
     return True
 
-def weaponScraper(x: float, y: float, screenInfo: ScreenInfo) -> tuple[dict[str, int], list[dict[str, dict[str, int]]]]:
+def weaponScraper(controller: WindowsInputController, x: float, y: float, screenInfo: ScreenInfo) -> tuple[dict[str, int], list[dict[str, dict[str, int]]]]:
     inventory = dict()
     weapons = list()
     _cache = dict()
-    roiInfo = getROI(screenInfo)
 
-    presskey(cfg.get(cfg.inventoryKeybind), 2, False)
-    leftClick(x, y)
+    controller.pressKey(cfg.get(cfg.inventoryKeybind), 2, False)
+    controller.leftClick(x, y)
 
-    weaponCount, pages = getWeaponPages(roiInfo)
+    weaponCount, pages = getWeaponPages(screenInfo)
     continueScraping = False
 
     for page in range(pages):
@@ -159,20 +119,19 @@ def weaponScraper(x: float, y: float, screenInfo: ScreenInfo) -> tuple[dict[str,
                     del _cache
                     return inventory, weapons
 
-                startCoords = roiInfo.coords['start']
-                center_x = startCoords.x + (col * (startCoords.w + screenInfo.scaleWidth(16))) + startCoords.w // 2
-                center_y = startCoords.y + (row * (startCoords.h + screenInfo.scaleHeight(24))) + startCoords.h // 2
+                center_x = screenInfo.weapons.start.x + (col * (screenInfo.weapons.start.w + screenInfo.offsets.page.x)) + screenInfo.weapons.start.w // 2
+                center_y = screenInfo.weapons.start.y + (row * (screenInfo.weapons.start.h + screenInfo.offsets.page.y)) + screenInfo.weapons.start.h // 2
                 
-                leftClick(center_x, center_y)
-                image = screenshot(width=screenInfo.width, height=screenInfo.height)
+                controller.leftClick(center_x, center_y)
+                image = screenshot(width=screenInfo.width, height=screenInfo.height, monitor=screenInfo.monitor)
                 
-                continueScraping = processGridItem(inventory, weapons, image, roiInfo, _cache)
+                continueScraping = processGridItem(inventory, weapons, image, screenInfo, _cache)
                 if not continueScraping:
                     del _cache
                     return inventory, weapons
 
         if page < pages - 1 and continueScraping:
-            mouseScroll(screenInfo.scaleHeight(-31.25, -31.75), 1.2)
+            controller.mouseScroll(screenInfo.scroll.page.y, 1.2)
 
     del _cache
     return inventory, weapons

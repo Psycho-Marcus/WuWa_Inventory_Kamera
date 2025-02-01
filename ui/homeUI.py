@@ -1,5 +1,6 @@
 import os
 import logging
+from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap, QImage
@@ -59,7 +60,8 @@ class HomeInterface(QWidget):
 			mainLayout = QHBoxLayout()
 
 			image_label = PixmapLabel()
-			image = QImage(FAILED[0]['image'])
+			try: image = QImage(FAILED[0]['image'])
+			except: image = QImage('')
 			pixmap = QPixmap.fromImage(image)
 			image_label.setPixmap(pixmap)
 			image_label.setScaledContents(True)
@@ -117,8 +119,7 @@ class HomeInterface(QWidget):
 		global FAILED
 
 		if FAILED:
-			try: os.remove(FAILED[0]['image'])
-			except: pass
+			Path(FAILED[0]['image']).unlink(missing_ok=True)
 			
 			FAILED.pop(0)
 			self.updateUISignal.emit()
@@ -251,6 +252,8 @@ class LControlPanel(QFrame):
 		self.scanResources.setChecked(cfg.scanResources.value)
 		self.scanAchievements.setChecked(cfg.scanAchievements.value)
 
+		self.onValueChanged()
+
 	def __connectSignals(self):
 		"""Connect signals to slots."""
 		self.scanResources.stateChanged.connect(self.onValueChanged)
@@ -268,12 +271,17 @@ class LControlPanel(QFrame):
 		cfg.scanCharacters.value = self.scanCharacters.isChecked()
 		cfg.scanWeapons.value = self.scanWeapons.isChecked()
 
-		if self.scanCharacters.isChecked() or self.scanWeapons.isChecked() or \
-		   self.scanEchoes.isChecked() or self.scanDevItems.isChecked() or \
-		   self.scanResources.isChecked():
+		if any([
+			self.scanCharacters.isChecked(),
+			self.scanWeapons.isChecked(),
+			self.scanEchoes.isChecked(),
+			self.scanDevItems.isChecked(),
+			self.scanResources.isChecked()
+		]):
 			self.scanAchievements.setChecked(False)
 			self.scanAchievements.setDisabled(True)
 		else:
+			self.onAchievementsToggled()
 			self.scanAchievements.setDisabled(False)
 
 		cfg.save()
@@ -306,8 +314,9 @@ class LControlPanel(QFrame):
 
 	def openFolder(self):
 		"""Open the export folder."""
-		os.makedirs(cfg.get(cfg.exportFolder), exist_ok=True)
-		os.startfile(cfg.get(cfg.exportFolder))
+		path = Path(cfg.get(cfg.exportFolder))
+		path.mkdir(parents=True, exist_ok=True)
+		os.startfile(path)
 
 class TControlPanel(QFrame):
 	"""Top Control Panel Interface."""

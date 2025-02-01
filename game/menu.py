@@ -1,9 +1,8 @@
 import time
 import logging
-from difflib import get_close_matches
+from difflib import get_close_matches as getMatches
 
-from game.screenSize import WindowManager
-from game.foreground import WindowFocusManager
+from game.foreground import WindowManager
 from scraping.utils.common import definedText
 from scraping.utils import (
     screenshot, imageToString
@@ -22,20 +21,21 @@ class MainMenuController:
             bool: True if the main menu is detected, False otherwise.
         """
         try:
-            screenInfo = WindowManager.getScreenInfo()
+            screenInfo = WindowManager().getScreenInfo()
             image = screenshot(
-                screenInfo.scaleWidth((140, 132)),
-                screenInfo.scaleHeight((40, 32)),
-                screenInfo.scaleWidth(150),
-                screenInfo.scaleHeight(40)
+                screenInfo.terminal.x,
+                screenInfo.terminal.y,
+                screenInfo.terminal.w,
+                screenInfo.terminal.h,
+                screenInfo.monitor
             )
 
             result = imageToString(image, '').lower()
             logger.debug(f"Detected text from screenshot: '{result}'")
             
-            return  'terminal' if get_close_matches(result, [definedText['PrefabTextItem_1547656443_Text']]) else 'none' # MULTILANG
+            return 'terminal' if getMatches(result, [definedText['PrefabTextItem_1547656443_Text']]) else False # MULTILANG
         except Exception as e:
-            logger.error(f"Failed to capture or process screenshot: {e}")
+            logger.error(f"Failed to capture or process screenshot: {e}", exc_info=True)
             return False
 
     def isInMainMenu(self):
@@ -49,7 +49,7 @@ class MainMenuController:
                 - Additional information (str): Empty string on success, error message on failure.
         """
         try:
-            result = WindowFocusManager().setForeground()
+            result = WindowManager().setForeground()
             if result[0] == 'error':
                 return result
             time.sleep(.2)
@@ -60,5 +60,5 @@ class MainMenuController:
             return '', '', ''
 
         except Exception as e:
-            logger.error(f"Exception occurred: {e}")
+            logger.error(f"Exception occurred: {e}", exc_info=True)
             return 'error', 'Exception', str(e)

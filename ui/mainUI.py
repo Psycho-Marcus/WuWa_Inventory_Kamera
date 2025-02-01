@@ -1,6 +1,5 @@
-import os
 import logging
-from pyuac import isUserAdmin
+from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon
@@ -15,6 +14,7 @@ from qfluentwidgets import (
 from ui.homeUI import HomeInterface
 from ui.settingsUI import SettingInterface
 from ui.inventoryUI import InventoryInterface
+from scraping.utils.common import isUserAdmin
 from properties.config import basePATH
 
 logger = logging.getLogger('WuWaInventoryKamera')
@@ -47,7 +47,7 @@ class WuWaInventoryKamera(MSFluentWindow):
 	def initWindow(self):
 		"""Initialize window settings including size, icon, and title."""
 		self.setFixedSize(1150, 700)
-		self.setWindowIcon(QIcon(os.path.join(basePATH, 'assets', 'icon.ico')))
+		self.setWindowIcon(QIcon(str(basePATH / 'assets' / 'icon.ico')))
 		self.setWindowTitle('WuWa Inventory Kamera')
 		self.titleBar.maxBtn.setHidden(True)
 		self.titleBar.maxBtn.setDisabled(True)

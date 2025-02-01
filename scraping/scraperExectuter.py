@@ -1,7 +1,6 @@
 from properties.config import cfg
+from scraping.utils.common import isUserAdmin
 from scraping.scraperManager import managerStart
-
-from pyuac import isUserAdmin
 
 def startScraper():
     if isUserAdmin():
