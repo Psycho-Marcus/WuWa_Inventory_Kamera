@@ -51,6 +51,128 @@ The data format is specifically designed for [WuWa Tracker](https://wuwatracker.
    - You can optionally check the data that has been scanned to ensure everything is captured correctly:  
    ![review](https://telegra.ph/file/f6c6f2790eb23aa7ce3b5.png)
 
+## Data
+
+<details>
+  <summary>inventory.json</summary>
+
+  ```json
+  {
+    "_comment": "itemID: string(int), quantity: int",
+    "2": 234
+  }
+  ```
+</details>
+
+<details>
+  <summary>characters.json</summary>
+
+  ```json
+  {
+    "_comment": "resonatorID(1205): string(int), if not the OCR failed and you will see a flatcase name of that",
+    "1205": {
+      "level": 90,
+      "ascension": 6,
+      "weapon": {
+        "_comment": "weaponID: int, if not the OCR failed and you will see a flatcase name of that",
+        "id": 21020064,
+        "level": 80,
+        "ascension": 5,
+        "rank": 1
+      },
+      "echoes": {},
+      "skills": {
+        "normal": 10,
+        "resonance": 10,
+        "forte": 10,
+        "liberation": 10,
+        "intro": 10,
+        "stats0": 2,
+        "stats1": 2,
+        "inherent": 2,
+        "stats3": 2,
+        "stats4": 2
+      },
+      "chain": 0
+    }
+  }
+  ```
+</details>
+
+<details>
+  <summary>weapons.json</summary>
+
+  ```json
+  [
+    {
+      "_comment": "weaponID(21030016): string(int), if not the OCR failed and you will see a flatcase name of that",
+      "21030016": {
+        "level": 50,
+        "ascension": 2,
+        "rank": 1
+      }
+    }
+  ]
+  ```
+</details>
+
+<details>
+  <summary>echoes.json</summary>
+
+  ```json
+  [
+    {
+      "_comment": "monsterID(340000070): string(int), if not the OCR failed and you will see a flatcase name of that",
+      "340000070": {
+        "_comment": "sonata: is always flatcase",
+        "level": 25,
+        "tuneLv": 5,
+        "sonata": "havoceclipse",
+        "rarity": 5,
+        "stats": {
+          "main": {
+            "cr%": 22.0,
+            "atk": 150
+          },
+          "sub": {
+            "atk": 40,
+            "def": 50,
+            "hp": 470,
+            "basicAttack%": 8.6
+          }
+        }
+      }
+    }
+  ]
+  ```
+  <details>
+    <summary>Echo stats</summary>
+
+
+  ```json
+  {
+    "_comment": "% will automatically be added to the stats if it is a percentage",
+    "hp": "hp",
+    "atk": "atk",
+    "critrate": "cr",
+    "critdmg": "cd",
+    "def": "def",
+    "energyregen": "er",
+    "resonanceskilldmgbonus": "skillDmg",
+    "basicattackdmgbonus": "basicAttack",
+    "heavyattackdmgbonus": "heavyAttack",
+    "resonanceliberationdmgbonus": "liberationDmg",
+    "glaciodmgbonus": "glacio",
+    "fusiondmgbonus": "fusion",
+    "electrodmgbonus": "electro",
+    "aerodmgbonus": "aero",
+    "spectrodmgbonus": "spectro",
+    "havocdmgbonus": "havoc",
+    "healingbonus": "healing"
+  }
+  ```
+  </details>
+</details>
 
 ## Credits
 - Highly inspired by [Inventory Kamera](https://github.com/Andrewthe13th/Inventory_Kamera) created by [Andrewthe13th](https://github.com/Andrewthe13th)
