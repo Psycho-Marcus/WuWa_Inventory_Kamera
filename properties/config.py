@@ -10,7 +10,7 @@ from qfluentwidgets import (
 	Signal
 )
 
-basePATH: Path = Path(getattr(sys, 'frozen', False) and sys._MEIPASS or Path()).parent
+basePATH: Path = Path(sys.executable if getattr(sys, 'frozen', False) else str()).parent
 ocr = RapidOCR()
 
 # Default values
